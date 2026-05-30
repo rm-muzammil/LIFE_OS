@@ -30,7 +30,7 @@ export async function sendLocalNotification(title: string, body: string, icon = 
     badge: '/icons/icon-72.png',
     vibrate: [100, 50, 100],
     tag: title, // prevent duplicates
-  })
+  } as NotificationOptions & { vibrate: number[] })
 }
 
 // ── Planned notification types (wired in Phase 2+) ──────────────────────────
