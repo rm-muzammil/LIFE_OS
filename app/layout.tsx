@@ -4,6 +4,13 @@ import { Sidebar } from '@/components/ui/Sidebar'
 import { MobileNav } from '@/components/ui/MobileNav'
 import { MobileHeader } from '@/components/ui/MobileHeader'
 import { InstallPrompt } from '@/components/ui/InstallPrompt'
+import { Amiri } from "next/font/google";
+
+const amiri = Amiri({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "700"],
+  variable: "--font-amiri",
+});
 
 export const metadata: Metadata = {
   title: 'Self-Khilafah',
@@ -43,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
+      <body  className={`bg-zinc-950 text-zinc-100 min-h-screen antialiased ${amiri.variable}`}>
         {/* Desktop sidebar — hidden on mobile */}
         <div className="hidden md:block">
           <Sidebar />

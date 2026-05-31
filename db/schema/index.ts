@@ -1,3 +1,4 @@
+// db/schema/index.ts
 import { pgTable, serial, date, boolean, integer, text, timestamp } from 'drizzle-orm/pg-core'
 
 // ── Daily ibadah log ─────────────────────────────────────────────────────────
@@ -32,3 +33,4 @@ export const ibadah = pgTable('ibadah', {
 
 export type Ibadah    = typeof ibadah.$inferSelect
 export type NewIbadah = typeof ibadah.$inferInsert
+export * from "./quran"

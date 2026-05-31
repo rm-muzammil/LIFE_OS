@@ -4,13 +4,12 @@ import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Moon, BookOpen, Star, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Top 5 most-used routes for mobile bottom nav
 const NAV = [
-  { href: '/',          icon: LayoutDashboard, label: 'Home'    },
-  { href: '/ibadah',    icon: Moon,            label: 'Ibadah'  },
-  { href: '/quran',     icon: BookOpen,        label: 'Quran'   },
-  { href: '/character', icon: Star,            label: 'Nafs'    },
-  { href: '/review',    icon: ClipboardList,   label: 'Review'  },
+  { href: '/',          icon: LayoutDashboard, label: 'Home',   exact: true  },
+  { href: '/ibadah',    icon: Moon,            label: 'Ibadah', exact: true  },
+  { href: '/quran',     icon: BookOpen,        label: 'Quran',  exact: false },
+  { href: '/character', icon: Star,            label: 'Nafs',   exact: true  },
+  { href: '/review',    icon: ClipboardList,   label: 'Review', exact: true  },
 ]
 
 export function MobileNav() {
@@ -22,18 +21,19 @@ export function MobileNav() {
         'fixed bottom-0 left-0 right-0 z-50',
         'bg-zinc-950/95 backdrop-blur-md',
         'border-t border-zinc-800',
-        // iOS safe area
         'pb-safe',
       )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-around px-2 pt-2 pb-1">
-        {NAV.map(({ href, icon: Icon, label }) => {
-          const active = path === href
+        {NAV.map(({ href, icon: Icon, label, exact }) => {
+          const active = exact ? path === href : path.startsWith(href)
+          // For Quran tab, navigate to the raku sub-route directly
+          const target = href === '/quran' ? '/quran/raku' : href
           return (
             <Link
               key={href}
-              href={href}
+              href={target}
               className={cn(
                 'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl',
                 'transition-colors duration-150 min-w-[56px]',

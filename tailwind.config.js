@@ -11,6 +11,7 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         arabic: ['Amiri', 'serif'],
+        amiri: ["var(--font-amiri)", "serif"],
       },
       colors: {
         brand: {
