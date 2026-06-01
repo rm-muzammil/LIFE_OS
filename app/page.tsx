@@ -3,6 +3,7 @@ import { ibadah } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { todayStr, formatDisplay, prayerCount, calcStreak, isFridayToday } from '@/lib/utils'
 import { Flame, BookOpen, Star, Moon, CheckCircle2 } from 'lucide-react'
+import { FaithScoreBanner } from '@/components/FaithScoreBanner'
 
 async function getDashboardData() {
   const today = todayStr()
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <FaithScoreBanner />
       {/* Header */}
       <div>
         <p className="label mb-1">Dashboard</p>
