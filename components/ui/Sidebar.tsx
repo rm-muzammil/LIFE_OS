@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Moon, BookOpen, Star,
   ClipboardList, BarChart3, Heart,
-  BookMarked, Brain, Sparkles, ChevronDown,
+  BookMarked, Brain, Sparkles, ChevronDown,Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +22,7 @@ const NAV = [
   { href: '/character',  icon: Star,            label: 'Character'      },
   { href: '/review',     icon: ClipboardList,   label: 'Weekly Review'  },
   { href: '/life-score', icon: BarChart3,       label: 'Life Score'     },
+  { href: '/settings',   icon: Settings,        label: 'Settings'       },
 ]
 
 export function Sidebar() {

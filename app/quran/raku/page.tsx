@@ -13,7 +13,6 @@ interface RakuData {
     rakuNum: number;
     tafseerdone: boolean;
     tajweedConfidence: number | null;
-    vocabPasted: boolean;
     completedAt: string | null;
   } | null;
 }
@@ -36,12 +35,6 @@ export default function RakuPage() {
   // Local state for current raku's three checks
   const [tafseerDone, setTafseerDone] = useState(false);
   const [tajweedConf, setTajweedConf] = useState<number | null>(null);
-  const [vocabPasted, setVocabPasted] = useState(false);
-  const [vocabText, setVocabText] = useState("");
-  const [showVocabModal, setShowVocabModal] = useState(false);
-  const [parsedVocab, setParsedVocab] = useState<
-    { word: string; root: string; meaning: string }[]
-  >([]);
   const [justCompleted, setJustCompleted] = useState(false);
 
   const fetchRaku = useCallback(async () => {
@@ -51,11 +44,11 @@ export default function RakuPage() {
     if (json.progress) {
       setTafseerDone(json.progress.tafseerdone);
       setTajweedConf(json.progress.tajweedConfidence);
-      setVocabPasted(json.progress.vocabPasted);
+
     } else {
       setTafseerDone(false);
       setTajweedConf(null);
-      setVocabPasted(false);
+
     }
     setLoading(false);
   }, []);
@@ -82,56 +75,22 @@ export default function RakuPage() {
     await save({
       tafseerdone: next,
       tajweedConfidence: tajweedConf,
-      vocabPasted,
+
     });
   };
 
   const handleTajweed = async (conf: number) => {
     setTajweedConf(conf);
-    await save({ tafseerdone: tafseerDone, tajweedConfidence: conf, vocabPasted });
+    await save({ tafseerdone: tafseerDone, tajweedConfidence: conf});
   };
 
-  const handleVocabParse = () => {
-    // Parse pasted text: each line: arabic | root | meaning
-    const lines = vocabText.split("\n").filter((l) => l.trim());
-    const words = lines.map((line) => {
-      const parts = line.split("|").map((p) => p.trim());
-      return {
-        word: parts[0] || "",
-        root: parts[1] || "",
-        meaning: parts[2] || "",
-      };
-    });
-    setParsedVocab(words.filter((w) => w.word && w.meaning));
-  };
 
-  const handleVocabSave = async () => {
-    if (!data || parsedVocab.length === 0) return;
-    setSaving(true);
-    await fetch("/api/vocab", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        words: parsedVocab.map((w) => ({
-          ...w,
-          firstSeenRaku: data.currentRaku,
-        })),
-      }),
-    });
-    setVocabPasted(true);
-    setShowVocabModal(false);
-    setVocabText("");
-    setParsedVocab([]);
-    await save({ tafseerdone: tafseerDone, tajweedConfidence: tajweedConf, vocabPasted: true });
-    setSaving(false);
-  };
-
-  const allDone = tafseerDone && tajweedConf !== null && vocabPasted;
+  const allDone = tafseerDone && tajweedConf !== null;
 
   const handleAdvance = async () => {
     if (!allDone || !data) return;
     setJustCompleted(true);
-    await save({ tafseerdone: tafseerDone, tajweedConfidence: tajweedConf, vocabPasted });
+    await save({ tafseerdone: tafseerDone, tajweedConfidence: tajweedConf });
     setTimeout(() => {
       setJustCompleted(false);
       fetchRaku();
@@ -249,38 +208,7 @@ export default function RakuPage() {
           <p className="text-xs text-zinc-600 pl-9">1 = Shaky · 5 = Mastered</p>
         </div>
 
-        {/* 3. Vocab paste */}
-        <div
-          className={`rounded-xl border p-4 transition-colors
-            ${vocabPasted ? "border-green-500/40 bg-green-500/5" : "border-zinc-800 bg-zinc-900"}`}
-        >
-          <div className="flex items-start gap-4">
-            <div
-              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors
-                ${vocabPasted ? "border-green-500 bg-green-500" : "border-zinc-600"}`}
-            >
-              {vocabPasted && (
-                <svg className="w-3.5 h-3.5 text-zinc-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-zinc-100 text-sm">Vocab Extraction</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Paste words extracted from this ruku (Arabic | Root | Meaning)
-              </p>
-            </div>
-            {!vocabPasted && (
-              <button
-                onClick={() => setShowVocabModal(true)}
-                className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                Add Words
-              </button>
-            )}
-          </div>
-        </div>
+
       </div>
 
       {/* Advance button */}
@@ -303,80 +231,7 @@ export default function RakuPage() {
         </p>
       )}
 
-      {/* Vocab Modal */}
-      {showVocabModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 space-y-4">
-            <h2 className="text-lg font-bold text-zinc-100">Paste Vocab Words</h2>
-            <p className="text-xs text-zinc-500">
-              One word per line. Format:{" "}
-              <span className="font-mono text-zinc-400">Arabic | Root | Meaning</span>
-              <br />
-              Root and meaning are optional if you separate with |
-            </p>
-            <p className="text-xs text-zinc-600 font-mono bg-zinc-800 rounded p-2">
-              كَتَبَ | ك ت ب | to write
-              <br />
-              عَلِمَ | ع ل م | to know
-            </p>
-            <textarea
-              className="w-full h-40 bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm text-zinc-100
-                placeholder:text-zinc-600 resize-none focus:outline-none focus:border-green-500/50
-                font-mono leading-relaxed"
-              placeholder={"كَتَبَ | ك ت ب | to write\nعَلِمَ | ع ل م | to know"}
-              value={vocabText}
-              onChange={(e) => setVocabText(e.target.value)}
-              dir="auto"
-            />
-            <button
-              onClick={handleVocabParse}
-              className="text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg transition-colors"
-            >
-              Preview ({vocabText.split("\n").filter((l) => l.trim()).length} lines)
-            </button>
 
-            {parsedVocab.length > 0 && (
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {parsedVocab.map((w, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 text-xs bg-zinc-800 rounded-lg px-3 py-1.5"
-                  >
-                    <span className="font-amiri text-base text-zinc-100" dir="rtl">
-                      {w.word}
-                    </span>
-                    {w.root && (
-                      <span className="text-zinc-500 font-amiri" dir="rtl">{w.root}</span>
-                    )}
-                    <span className="text-zinc-400 ml-auto">{w.meaning}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setShowVocabModal(false);
-                  setVocabText("");
-                  setParsedVocab([]);
-                }}
-                className="flex-1 py-2.5 rounded-xl text-sm text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleVocabSave}
-                disabled={parsedVocab.length === 0 || saving}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-green-500 hover:bg-green-400
-                  text-zinc-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Save {parsedVocab.length} Words
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

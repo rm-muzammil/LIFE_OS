@@ -1,9 +1,10 @@
+// src/components/ui/MobileNav.tsx
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Moon, BookOpen, Star, ClipboardList,
-  BookMarked, Brain, Sparkles,
+  BookMarked, Brain, Sparkles,Settings, BarChart3
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +14,8 @@ const NAV = [
   { href: '/quran',     icon: BookOpen,        label: 'Quran',  exact: false },
   { href: '/character', icon: Star,            label: 'Nafs',   exact: true  },
   { href: '/review',    icon: ClipboardList,   label: 'Review', exact: true  },
+  { href: '/life-score', icon: BarChart3,       label: 'Score',    exact: true },
+  { href: '/settings',   icon: Settings,        label: 'Settings', exact: true },
 ]
 
 const QURAN_SUB = [

@@ -23,8 +23,7 @@ export async function GET() {
       const latest = rows[0];
       const allDone =
         latest.tafseerdone &&
-        latest.tajweedConfidence !== null &&
-        latest.vocabPasted;
+        latest.tajweedConfidence !== null
 
       if (allDone) {
         // Advance to next raku
@@ -56,7 +55,7 @@ export async function GET() {
     let expected = currentRaku - 1;
     for (const row of completed) {
       const isDone =
-        row.tafseerdone && row.tajweedConfidence !== null && row.vocabPasted;
+        row.tafseerdone && row.tajweedConfidence !== null;
       if (isDone && row.rakuNum === expected) {
         streakCount++;
         expected--;
@@ -82,11 +81,11 @@ export async function GET() {
 
 // POST /api/raku
 // Body: { rakuNum } — creates or updates the progress row
-// Patch fields: tafseerdone, tajweedConfidence, vocabPasted
+// Patch fields: tafseerdone, tajweedConfidence
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { rakuNum, tafseerdone, tajweedConfidence, vocabPasted } = body;
+    const { rakuNum, tafseerdone, tajweedConfidence} = body;
 
     if (!rakuNum || rakuNum < 1 || rakuNum > TOTAL_RAKU) {
       return NextResponse.json({ error: "Invalid rakuNum" }, { status: 400 });
@@ -102,8 +101,7 @@ export async function POST(req: Request) {
     const allDone =
       (tafseerdone ?? existing[0]?.tafseerdone ?? false) &&
       (tajweedConfidence ?? existing[0]?.tajweedConfidence) !== null &&
-      (tajweedConfidence ?? existing[0]?.tajweedConfidence) !== undefined &&
-      (vocabPasted ?? existing[0]?.vocabPasted ?? false);
+      (tajweedConfidence ?? existing[0]?.tajweedConfidence) !== undefined;
 
     const completedAt = allDone ? new Date() : null;
 
@@ -112,7 +110,6 @@ export async function POST(req: Request) {
         rakuNum,
         tafseerdone: tafseerdone ?? false,
         tajweedConfidence: tajweedConfidence ?? null,
-        vocabPasted: vocabPasted ?? false,
         completedAt: completedAt,
       });
     } else {
@@ -120,7 +117,6 @@ export async function POST(req: Request) {
       if (tafseerdone !== undefined) updates.tafseerdone = tafseerdone;
       if (tajweedConfidence !== undefined)
         updates.tajweedConfidence = tajweedConfidence;
-      if (vocabPasted !== undefined) updates.vocabPasted = vocabPasted;
       if (allDone && !existing[0].completedAt)
         updates.completedAt = new Date();
 

@@ -1,3 +1,4 @@
+// src/app/api/ibadah/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ibadah } from '@/db/schema'
