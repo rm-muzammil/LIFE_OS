@@ -1,88 +1,47 @@
-# Self-Khilafah — Phase 1
+# Self-Khilafah — Collective Fixes: what's in this package
 
-Life governance dashboard. Personal app, no auth, single user.
+## New / rewritten files (drop in as-is)
+- `app/page.tsx` — dashboard, rewritten per Fix 1
+- `components/ProvinceScoreStrip.tsx` — new, replaces `FaithScoreBanner.tsx` (Fix 2)
+- `components/LifeScoreRing.tsx` — new, weighted total ring (Fix 1)
+- `app/api/life-score/route.ts` — rewritten per Fix 3
+- `components/GitHubBoxes.tsx` — rewritten per Fix 4
+- `app/api/provinces/faith-history/route.ts` — new per Fix 4
+- `app/api/github-boxes/route.ts` — new per Fix 7 (net effect of delete-then-recreate in Fix 5/Fix 7)
+- `app/ibadah/page.tsx`, `app/quran/page.tsx` — redirects per Fix 5
+- `components/Sidebar.tsx`, `components/MobileNav.tsx` — rewritten per Fix 6
 
-## Stack
-- Next.js 14 (App Router)
-- Neon (serverless Postgres)
-- Drizzle ORM
-- Tailwind CSS
+## Manual patches (can't safely auto-generate — see patches/)
+- `patches/1-schema-addition.md` — add `provinceDailySnapshots` (and `lifeScoreHistory` if it doesn't already exist) to `db/schema/index.ts`, then run your migration.
+- `patches/2-report-route-snapshot-hook.md` — add a snapshot write to the end of `app/api/provinces/report/route.ts`. This route was on your "don't touch" list, but Fix 7 requires this specific addition — flagging it rather than silently editing a file I've never seen.
 
----
-
-## Setup — follow in order
-
-### 1. Install dependencies
-```bash
-npm install
+## Delete these (Fix 5)
 ```
-
-### 2. Create Neon database
-1. Go to https://console.neon.tech
-2. Sign up / log in
-3. Create a new project → name it `self-khilafah`
-4. Copy the **Connection string** (looks like `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`)
-
-### 3. Set environment variable
-```bash
-cp .env.local.example .env.local
+app/ibadah/               → replaced with redirect page above, delete the rest of the old route's files
+app/quran/                → same
+app/api/ibadah/
+app/api/daily-score/
+app/api/faith-score/
+app/api/streak/
+app/api/raku/
+app/api/vocab/
+app/api/memorization/
+app/api/impact/
+components/FaithScoreBanner.tsx   → replaced by ProvinceScoreStrip.tsx
 ```
-Open `.env.local` and paste your Neon connection string:
-```
-DATABASE_URL="postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require"
-```
+(`app/api/github-boxes/` is NOT deleted — it's replaced in place, see above.)
 
-### 4. Push schema to database
-This creates all tables in Neon automatically:
-```bash
-npm run db:push
-```
-When prompted, type `yes` to confirm.
+## Untouched, per your rules
+`db/schema/index.ts` (aside from the addition), `app/api/provinces/report|register|[slug]`,
+`app/settings/page.tsx`, `app/character/`, `app/api/character/`, `app/review/page.tsx`,
+`app/api/review/`, `components/WeeklyGraphs.tsx`, all PWA files.
 
-### 5. Run the app
-```bash
-npm run dev
-```
-Open http://localhost:3000
+## Assumptions worth double-checking against your real schema
+- `provinces` table has `slug, name, cachedScore, cachedDetails, cachedAt, weight, active, url`.
+- `characterRatings` has numeric rating columns + `createdAt`.
+- `weeklyReview` has `missionAlignScore` (assumed 0–10 scale) + `createdAt`.
+- Province apps push a `streak` field inside `cachedDetails`.
+- Faith Tracker optionally exposes `GET /api/activity` returning `{ days: [{date, salah, rakuDone, verseDone, dhikrDone}] }` for live history pull; falls back to local snapshots if absent/unreachable.
 
----
-
-## What's built in Phase 1
-
-| Module | Route | Status |
-|---|---|---|
-| Dashboard | `/` | ✅ Done |
-| Daily Ibadah | `/ibadah` | ✅ Done |
-| Quran & Arabic | `/quran` | 🔜 Phase 2 |
-| Character | `/character` | 🔜 Phase 3 |
-| Weekly Review | `/review` | 🔜 Phase 3 |
-| Life Score | `/life-score` | 🔜 Phase 4 |
-
-## Daily Ibadah tracks
-- **Salah** — 5 prayers individually (Fajr, Dhuhr, Asr, Maghrib, Isha)
-- **Quran pages** — with quick-set buttons (1, 2, 4, 8 pages)
-- **Surah Al-Mulk** — nightly checkbox (always available)
-- **Surah Al-Kahf** — Friday only (disabled other days)
-- **Dhikr** — done/not done
-- **Daily reflection** — one honest line, saves on blur
-- **Prayer streak** — counts consecutive days with all 5 prayers
-
----
-
-## Database commands
-```bash
-npm run db:push      # Push schema changes to Neon
-npm run db:studio    # Open Drizzle Studio (visual DB browser)
-```
-
----
-
-## Phase 2 context (for next conversation)
-Paste this at the start of the next conversation:
-
-> Self-Khilafah is a personal Next.js 14 + Neon + Drizzle app.
-> Phase 1 is done: app shell, sidebar, dashboard, daily ibadah (5 prayers,
-> Quran pages, Surah Mulk nightly, Surah Kahf Fridays, dhikr, reflection, streak).
-> Phase 2 needs: raku tracker (Dr Israr tafseer + tajweed + vocab bank),
-> daily verse memorization (Juz 30 back to front, An-Nas → Al-Falaq → ...),
-> verses of impact collection. DB is Neon, schema in db/schema/index.ts.
+If any of these don't match your actual schema, the field names are the only
+thing that needs adjusting — the logic/shape described in your spec is intact.

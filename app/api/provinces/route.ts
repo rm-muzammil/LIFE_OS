@@ -5,6 +5,8 @@ import { db } from '@/lib/db'
 import { provinces } from '@/db/schema'
 import { asc } from 'drizzle-orm'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const rows = await db
     .select({

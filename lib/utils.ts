@@ -1,13 +1,14 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, parseISO, isToday, isFriday } from 'date-fns'
+import { format, parseISO, isFriday } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// PKT-aware — fixes UTC offset on Vercel (UTC) for Pakistan (UTC+5)
 export function todayStr(): string {
-  return format(new Date(), 'yyyy-MM-dd')
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 }
 
 export function formatDisplay(dateStr: string): string {
@@ -15,10 +16,13 @@ export function formatDisplay(dateStr: string): string {
 }
 
 export function isFridayToday(): boolean {
-  return isFriday(new Date())
+  const day = new Date().toLocaleDateString('en-US', {
+    timeZone: 'Asia/Karachi',
+    weekday: 'long',
+  })
+  return day === 'Friday'
 }
 
-// Count prayers completed out of 5
 export function prayerCount(row: {
   fajr: boolean; dhuhr: boolean; asr: boolean
   maghrib: boolean; isha: boolean
@@ -27,21 +31,19 @@ export function prayerCount(row: {
     .filter(Boolean).length
 }
 
-// Calculate current ibadah streak from sorted daily rows
 export function calcStreak(dates: string[]): number {
   if (!dates.length) return 0
   const sorted = [...dates].sort((a, b) => b.localeCompare(a))
   let streak = 0
-  let cursor = new Date()
-  cursor.setHours(0, 0, 0, 0)
+  let cursor = todayStr()
 
   for (const d of sorted) {
-    const rowDate = parseISO(d)
-    rowDate.setHours(0, 0, 0, 0)
-    const diff = Math.round((cursor.getTime() - rowDate.getTime()) / 86400000)
+    const diff = Math.round(
+      (new Date(cursor).getTime() - new Date(d).getTime()) / 86400000
+    )
     if (diff === 0 || diff === 1) {
       streak++
-      cursor = rowDate
+      cursor = d
     } else {
       break
     }
