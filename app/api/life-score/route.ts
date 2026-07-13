@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { provinces, characterRatings, weeklyReview, lifeScoreHistory } from '@/db/schema'
+import { provinces, characterRatings, weeklyReview, provinceDailySnapshots } from '@/db/schema'
 import { desc, eq } from 'drizzle-orm'
 
 // Base weights — normalised at compute time so they always sum to 1.0,
@@ -63,9 +63,9 @@ async function getMissionScore(): Promise<number | null> {
 async function getCarryForwardScore(slug: string): Promise<number | null> {
   const [last] = await db
     .select()
-    .from(lifeScoreHistory)
-    .where(eq(lifeScoreHistory.slug, slug))
-    .orderBy(desc(lifeScoreHistory.date))
+    .from(provinceDailySnapshots)
+    .where(eq(provinceDailySnapshots.slug, slug))
+    .orderBy(desc(provinceDailySnapshots.date))
     .limit(1)
 
   return last?.score ?? null
@@ -127,10 +127,10 @@ export async function GET() {
   // Persist today's total so tomorrow's carry-forward / history graphs have something to read.
   try {
     await db
-      .insert(lifeScoreHistory)
-      .values({ date, slug: 'total', score: lifeScore } as any)
-      .onConflictDoUpdate?.({
-        target: [lifeScoreHistory.date, lifeScoreHistory.slug] as any,
+      .insert(provinceDailySnapshots)
+      .values({ date, slug: 'total', score: lifeScore, details: null })
+      .onConflictDoUpdate({
+        target: [provinceDailySnapshots.date, provinceDailySnapshots.slug],
         set: { score: lifeScore },
       })
   } catch {

@@ -9,6 +9,7 @@ import {
   timestamp,
   smallint,
   real,
+  uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core'
 
@@ -128,3 +129,15 @@ export type NewProvince = typeof provinces.$inferInsert
 export * from './quran'
 
 
+
+// ── Province daily snapshots — for GitHub-style activity history ───────────
+export const provinceDailySnapshots = pgTable("province_daily_snapshots", {
+  id:        serial("id").primaryKey(),
+  date:      date("date").notNull(),
+  slug:      text("slug").notNull(),
+  score:     real("score").notNull(),
+  details:   jsonb("details"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqueIdx: uniqueIndex("snapshot_date_slug_idx").on(t.date, t.slug),
+}))
