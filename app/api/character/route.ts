@@ -1,62 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { characterRatings } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { characterRatings } from '@/db/schema';
+import { desc, eq } from 'drizzle-orm';
+import { isoWeekPKT } from '@/lib/time';
 
-// GET /api/character?weeks=8     → last N weeks, chronological
-// GET /api/character?week=2025-W23 → single week or null
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const week  = searchParams.get('week')
-  const weeks = parseInt(searchParams.get('weeks') ?? '8', 10)
-
-  if (week) {
-    const [row] = await db
-      .select()
-      .from(characterRatings)
-      .where(eq(characterRatings.isoWeek, week))
-      .limit(1)
-    return NextResponse.json(row ?? null)
+export async function GET() {
+  try {
+    const rows = await db.select().from(characterRatings).orderBy(desc(characterRatings.isoWeek));
+    return NextResponse.json({ weeks: rows });
+  } catch (err) {
+    console.error('character GET error', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-
-  const rows = await db
-    .select()
-    .from(characterRatings)
-    .orderBy(desc(characterRatings.isoWeek))
-    .limit(weeks)
-
-  return NextResponse.json(rows.reverse())  // chronological for charts
 }
 
-// POST /api/character  — upsert
 export async function POST(req: NextRequest) {
-  const { isoWeek, patience, discipline, gratitude, humility, truthfulness } = await req.json()
+  try {
+    const body = await req.json();
+    const { patience, discipline, gratitude, humility, truthfulness, isoWeek } = body as {
+      patience: number;
+      discipline: number;
+      gratitude: number;
+      humility: number;
+      truthfulness: number;
+      isoWeek?: string;
+    };
 
-  if (!isoWeek) return NextResponse.json({ error: 'isoWeek required' }, { status: 400 })
+    const values = [patience, discipline, gratitude, humility, truthfulness];
+    if (values.some((v) => typeof v !== 'number' || v < 1 || v > 5)) {
+      return NextResponse.json({ error: 'All virtues must be a number 1-5' }, { status: 400 });
+    }
 
-  for (const [k, v] of Object.entries({ patience, discipline, gratitude, humility, truthfulness })) {
-    if (typeof v !== 'number' || v < 1 || v > 5)
-      return NextResponse.json({ error: `${k} must be 1–5` }, { status: 400 })
+    const week = isoWeek || isoWeekPKT();
+
+    const [existing] = await db
+      .select()
+      .from(characterRatings)
+      .where(eq(characterRatings.isoWeek, week));
+
+    let result;
+    if (existing) {
+      [result] = await db
+        .update(characterRatings)
+        .set({ patience, discipline, gratitude, humility, truthfulness, updatedAt: new Date() })
+        .where(eq(characterRatings.isoWeek, week))
+        .returning();
+    } else {
+      [result] = await db
+        .insert(characterRatings)
+        .values({ isoWeek: week, patience, discipline, gratitude, humility, truthfulness })
+        .returning();
+    }
+
+    return NextResponse.json({ week: result });
+  } catch (err) {
+    console.error('character POST error', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-
-  const [existing] = await db
-    .select({ id: characterRatings.id })
-    .from(characterRatings)
-    .where(eq(characterRatings.isoWeek, isoWeek))
-    .limit(1)
-
-  if (existing) {
-    const [row] = await db
-      .update(characterRatings)
-      .set({ patience, discipline, gratitude, humility, truthfulness, updatedAt: new Date() })
-      .where(eq(characterRatings.isoWeek, isoWeek))
-      .returning()
-    return NextResponse.json(row)
-  }
-
-  const [row] = await db
-    .insert(characterRatings)
-    .values({ isoWeek, patience, discipline, gratitude, humility, truthfulness })
-    .returning()
-  return NextResponse.json(row, { status: 201 })
 }

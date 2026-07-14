@@ -1,47 +1,101 @@
-# Self-Khilafah — Collective Fixes: what's in this package
+# Self-Khilafah v2
 
-## New / rewritten files (drop in as-is)
-- `app/page.tsx` — dashboard, rewritten per Fix 1
-- `components/ProvinceScoreStrip.tsx` — new, replaces `FaithScoreBanner.tsx` (Fix 2)
-- `components/LifeScoreRing.tsx` — new, weighted total ring (Fix 1)
-- `app/api/life-score/route.ts` — rewritten per Fix 3
-- `components/GitHubBoxes.tsx` — rewritten per Fix 4
-- `app/api/provinces/faith-history/route.ts` — new per Fix 4
-- `app/api/github-boxes/route.ts` — new per Fix 7 (net effect of delete-then-recreate in Fix 5/Fix 7)
-- `app/ibadah/page.tsx`, `app/quran/page.tsx` — redirects per Fix 5
-- `components/Sidebar.tsx`, `components/MobileNav.tsx` — rewritten per Fix 6
+Life governance kernel. Receives daily reports from your 6 province apps, computes a
+weighted life score, and tracks character, weekly review, and hadith study.
 
-## Manual patches (can't safely auto-generate — see patches/)
-- `patches/1-schema-addition.md` — add `provinceDailySnapshots` (and `lifeScoreHistory` if it doesn't already exist) to `db/schema/index.ts`, then run your migration.
-- `patches/2-report-route-snapshot-hook.md` — add a snapshot write to the end of `app/api/provinces/report/route.ts`. This route was on your "don't touch" list, but Fix 7 requires this specific addition — flagging it rather than silently editing a file I've never seen.
+## Stack
 
-## Delete these (Fix 5)
+- Next.js 14 (App Router) + Drizzle ORM + Neon serverless Postgres
+- Tailwind (zinc-950 dark theme, brand green accent)
+- recharts, lucide-react
+- PWA via next-pwa (installable, offline fallback)
+- No auth — this is a personal, single-user app
+
+## Setup
+
+```bash
+pnpm install
+cp .env.example .env.local
+# edit .env.local and set DATABASE_URL to your Neon connection string
+cp .env.local .env
+pnpm db:push
+pnpm dev
 ```
-app/ibadah/               → replaced with redirect page above, delete the rest of the old route's files
-app/quran/                → same
-app/api/ibadah/
-app/api/daily-score/
-app/api/faith-score/
-app/api/streak/
-app/api/raku/
-app/api/vocab/
-app/api/memorization/
-app/api/impact/
-components/FaithScoreBanner.tsx   → replaced by ProvinceScoreStrip.tsx
+
+Open http://localhost:3000
+
+## Registering your 6 provinces
+
+Go to `/provinces` in the app and click **New** for each province:
+
+| Name          | Slug            | URL                                         | Weight |
+|---------------|-----------------|----------------------------------------------|--------|
+| Faith         | faith           | https://faithtracker.vercel.app              | 0.25   |
+| Personal      | personal        | https://personal-app.vercel.app              | 0.20   |
+| Wealth        | wealth          | https://wealth-app-eta.vercel.app            | 0.15   |
+| Roadmap       | roadmap         | https://life-os-chi-ecru.vercel.app          | 0.15   |
+| Relationships | relationships   | (your deployed URL)                          | 0.10   |
+| Work          | work            | (your deployed URL)                          | 0.10   |
+
+**The slug must exactly match the lowercase `label` each province sends in its push
+payload** (e.g. a province pushing `"label": "Faith"` is matched against slug `faith`).
+
+After registering, you'll see the generated `X-Api-Key` and `Pull Secret` **once** —
+copy them into that province app's environment variables immediately:
+
+- The province app should send `X-Api-Key: {rawApiKey}` when it `POST`s to
+  `/api/provinces/report` on this app.
+- This app sends `Authorization: Bearer {pullSecret}` when it pulls from
+  `{province.url}/api/report` — your province app should verify that secret.
+
+Alternatively, run the seed script against a running instance to register all 6 at once
+(update the two placeholder URLs first):
+
+```bash
+BASE_URL=http://localhost:3000 npx tsx scripts/seed-provinces.ts
 ```
-(`app/api/github-boxes/` is NOT deleted — it's replaced in place, see above.)
 
-## Untouched, per your rules
-`db/schema/index.ts` (aside from the addition), `app/api/provinces/report|register|[slug]`,
-`app/settings/page.tsx`, `app/character/`, `app/api/character/`, `app/review/page.tsx`,
-`app/api/review/`, `components/WeeklyGraphs.tsx`, all PWA files.
+## Deploying to Vercel
 
-## Assumptions worth double-checking against your real schema
-- `provinces` table has `slug, name, cachedScore, cachedDetails, cachedAt, weight, active, url`.
-- `characterRatings` has numeric rating columns + `createdAt`.
-- `weeklyReview` has `missionAlignScore` (assumed 0–10 scale) + `createdAt`.
-- Province apps push a `streak` field inside `cachedDetails`.
-- Faith Tracker optionally exposes `GET /api/activity` returning `{ days: [{date, salah, rakuDone, verseDone, dhikrDone}] }` for live history pull; falls back to local snapshots if absent/unreachable.
+1. Push this repo to GitHub.
+2. Import into Vercel.
+3. Add `DATABASE_URL` (and optionally `CRON_SECRET`) as environment variables.
+4. Vercel will pick up `vercel.json`'s daily cron
+   (`0 0 * * *` UTC) hitting `/api/cron/pull-provinces`.
+5. If you set `CRON_SECRET`, Vercel automatically sends it as
+   `Authorization: Bearer {CRON_SECRET}` — the route checks this.
 
-If any of these don't match your actual schema, the field names are the only
-thing that needs adjusting — the logic/shape described in your spec is intact.
+## Life score formula
+
+```
+characterScore = avg(patience, discipline, gratitude, humility, truthfulness) / 5 * 100
+missionScore    = (missionAlignScore - 1) / 4 * 100
+
+totalWeight = sum(active province weights) + 0.03 (character) + 0.02 (mission)
+lifeScore = (
+  sum(province.cachedScore * province.weight) +
+  characterScore * 0.03 +
+  missionScore * 0.02
+) / totalWeight
+```
+
+## Timezone
+
+Everything (daily snapshots, ISO week keys, "today" on the dashboard) is computed
+in `Asia/Karachi` (PKT), never the server's local timezone.
+
+## Project structure
+
+```
+app/                  — pages + API routes (App Router)
+  api/provinces/       — report (push), register, [slug] (patch/delete), list
+  api/life-score/      — current score + 12-week history
+  api/character/       — weekly virtue ratings
+  api/review/          — weekly review
+  api/hadith/          — weekly hadith log
+  api/cron/            — daily pull job
+components/           — Sidebar, BottomNav, ScoreRing, ProvinceCard
+db/                    — Drizzle schema + connection
+lib/                   — time (PKT), auth (bcrypt), life-score formula, shared types
+scripts/               — seed-provinces.ts
+```

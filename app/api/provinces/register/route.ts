@@ -1,40 +1,52 @@
-// POST /api/provinces/register
-// Creates a new province. Returns raw apiKey + pullSecret ONCE.
-
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { provinces } from '@/db/schema'
-import bcrypt from 'bcryptjs'
-import { randomBytes } from 'crypto'
-
-function makeKey(len = 32) {
-  return randomBytes(len).toString('hex')
-}
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { provinces } from '@/db/schema';
+import { generateRawKey, generatePullSecret, hashApiKey } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
-  const { name, slug, url, weight } = await req.json()
+  try {
+    const body = await req.json();
+    const { name, slug, url, weight } = body as {
+      name?: string;
+      slug?: string;
+      url?: string;
+      weight?: number;
+    };
 
-  if (!name || !slug || !url || weight == null) {
-    return NextResponse.json({ error: 'name, slug, url, weight required' }, { status: 400 })
+    if (!name || !slug || !url || typeof weight !== 'number') {
+      return NextResponse.json(
+        { error: 'name, slug, url, and weight are required' },
+        { status: 400 }
+      );
+    }
+
+    const rawApiKey = generateRawKey(slug);
+    const pullSecret = generatePullSecret();
+    const apiKeyHash = await hashApiKey(rawApiKey);
+
+    const [created] = await db
+      .insert(provinces)
+      .values({
+        name,
+        slug: slug.toLowerCase().trim(),
+        url,
+        weight,
+        apiKeyHash,
+        pullSecret,
+      })
+      .returning();
+
+    // Raw apiKey + pullSecret are returned ONLY here, once. Never stored in plaintext (apiKey).
+    return NextResponse.json({
+      province: { ...created, apiKeyHash: undefined },
+      rawApiKey,
+      pullSecret,
+    });
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      return NextResponse.json({ error: 'A province with that slug already exists' }, { status: 409 });
+    }
+    console.error('provinces/register error', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-
-  const rawApiKey     = makeKey()
-  const rawPullSecret = makeKey()
-
-  const [apiKeyHash, pullSecret] = await Promise.all([
-    bcrypt.hash(rawApiKey, 10),
-    bcrypt.hash(rawPullSecret, 10),
-  ])
-
-  await db.insert(provinces).values({
-    name,
-    slug,
-    url,
-    weight: Number(weight),
-    apiKeyHash,
-    pullSecret,
-  })
-
-  // Return raw keys once — never stored in plaintext
-  return NextResponse.json({ apiKey: rawApiKey, pullSecret: rawPullSecret })
 }

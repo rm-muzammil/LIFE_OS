@@ -1,85 +1,80 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { weeklyReview, characterRatings } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { weeklyReview } from '@/db/schema';
+import { desc, eq } from 'drizzle-orm';
+import { isoWeekPKT } from '@/lib/time';
 
-// GET /api/review?week=2025-W23   → review + character for that week
-// GET /api/review?limit=20        → list of past reviews (newest first)
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const week  = searchParams.get('week')
-  const limit = parseInt(searchParams.get('limit') ?? '20', 10)
-
-  if (week) {
-    const [review] = await db
-      .select()
-      .from(weeklyReview)
-      .where(eq(weeklyReview.isoWeek, week))
-      .limit(1)
-
-    const [character] = await db
-      .select()
-      .from(characterRatings)
-      .where(eq(characterRatings.isoWeek, week))
-      .limit(1)
-
-    return NextResponse.json({ review: review ?? null, character: character ?? null })
+export async function GET() {
+  try {
+    const rows = await db.select().from(weeklyReview).orderBy(desc(weeklyReview.isoWeek));
+    return NextResponse.json({ weeks: rows });
+  } catch (err) {
+    console.error('review GET error', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-
-  const rows = await db
-    .select({
-      id:      weeklyReview.id,
-      isoWeek: weeklyReview.isoWeek,
-      missionAlignScore: weeklyReview.missionAlignScore,
-      createdAt: weeklyReview.createdAt,
-    })
-    .from(weeklyReview)
-    .orderBy(desc(weeklyReview.isoWeek))
-    .limit(limit)
-
-  return NextResponse.json(rows)
 }
 
-// POST /api/review  — upsert
 export async function POST(req: NextRequest) {
-  const {
-    isoWeek, wentWell, wentWrong, distractions,
-    mustImprove, intentions, missionAlignScore, missionAlignNote,
-  } = await req.json()
+  try {
+    const body = await req.json();
+    const {
+      wentWell,
+      wentWrong,
+      distractions,
+      mustImprove,
+      intentions,
+      missionAlignScore,
+      missionAlignNote,
+      isoWeek,
+    } = body as {
+      wentWell?: string;
+      wentWrong?: string;
+      distractions?: string;
+      mustImprove?: string;
+      intentions?: string;
+      missionAlignScore?: number;
+      missionAlignNote?: string;
+      isoWeek?: string;
+    };
 
-  if (!isoWeek) return NextResponse.json({ error: 'isoWeek required' }, { status: 400 })
-  if (typeof missionAlignScore !== 'number' || missionAlignScore < 1 || missionAlignScore > 5)
-    return NextResponse.json({ error: 'missionAlignScore must be 1–5' }, { status: 400 })
+    if (
+      missionAlignScore != null &&
+      (typeof missionAlignScore !== 'number' || missionAlignScore < 1 || missionAlignScore > 5)
+    ) {
+      return NextResponse.json({ error: 'missionAlignScore must be 1-5' }, { status: 400 });
+    }
 
-  const payload = {
-    wentWell:          wentWell          ?? '',
-    wentWrong:         wentWrong         ?? '',
-    distractions:      distractions      ?? '',
-    mustImprove:       mustImprove       ?? '',
-    intentions:        intentions        ?? '',
-    missionAlignScore,
-    missionAlignNote:  missionAlignNote  ?? '',
-    updatedAt: new Date(),
+    const week = isoWeek || isoWeekPKT();
+
+    const [existing] = await db.select().from(weeklyReview).where(eq(weeklyReview.isoWeek, week));
+
+    const values = {
+      wentWell: wentWell ?? '',
+      wentWrong: wentWrong ?? '',
+      distractions: distractions ?? '',
+      mustImprove: mustImprove ?? '',
+      intentions: intentions ?? '',
+      missionAlignScore: missionAlignScore ?? null,
+      missionAlignNote: missionAlignNote ?? '',
+    };
+
+    let result;
+    if (existing) {
+      [result] = await db
+        .update(weeklyReview)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(weeklyReview.isoWeek, week))
+        .returning();
+    } else {
+      [result] = await db
+        .insert(weeklyReview)
+        .values({ isoWeek: week, ...values })
+        .returning();
+    }
+
+    return NextResponse.json({ week: result });
+  } catch (err) {
+    console.error('review POST error', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-
-  const [existing] = await db
-    .select({ id: weeklyReview.id })
-    .from(weeklyReview)
-    .where(eq(weeklyReview.isoWeek, isoWeek))
-    .limit(1)
-
-  if (existing) {
-    const [row] = await db
-      .update(weeklyReview)
-      .set(payload)
-      .where(eq(weeklyReview.isoWeek, isoWeek))
-      .returning()
-    return NextResponse.json(row)
-  }
-
-  const [row] = await db
-    .insert(weeklyReview)
-    .values({ isoWeek, ...payload })
-    .returning()
-  return NextResponse.json(row, { status: 201 })
 }

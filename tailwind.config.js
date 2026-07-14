@@ -2,32 +2,40 @@
 module.exports = {
   darkMode: 'class',
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        arabic: ['Amiri', 'serif'],
-        amiri: ["var(--font-amiri)", "serif"],
-      },
       colors: {
         brand: {
-          50:  '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
+          50: '#ecfdf3',
+          100: '#d1fae0',
+          200: '#a7f3c8',
+          300: '#6ee7a8',
+          400: '#34d883',
+          500: '#16a34a',
+          600: '#0f8f3f',
+          700: '#0c7233',
+          800: '#0a5a29',
+          900: '#084a22',
+          950: '#042a12',
+        },
+      },
+      fontFamily: {
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        arabic: ['var(--font-arabic)', 'serif'],
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.3s ease-in-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
       },
     },
   },
   plugins: [],
-}
+};

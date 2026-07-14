@@ -1,46 +1,71 @@
-// GET /api/cron/pull-provinces
-// Daily cron — polls all active provinces. Skips silently on failure (carry forward).
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { provinces, provinceDailySnapshots } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { todayPKT } from '@/lib/time';
+import type { ProvinceReportPayload } from '@/lib/types';
 
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { provinces } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
-export async function GET() {
-  const active = await db
-    .select()
-    .from(provinces)
-    .where(eq(provinces.active, true))
+export async function GET(req: NextRequest) {
+  // Vercel cron sends an Authorization: Bearer {CRON_SECRET} header when CRON_SECRET is set.
+  const authHeader = req.headers.get('authorization');
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const results: { slug: string; ok: boolean; error?: string }[] = []
+  const active = await db.select().from(provinces).where(eq(provinces.active, true));
+  const date = todayPKT();
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     active.map(async (p) => {
-      try {
-        const res = await fetch(`${p.url}/api/report`, {
-          headers: { Authorization: `Bearer ${p.pullSecret}` },
-          signal: AbortSignal.timeout(8000),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!p.url) throw new Error(`${p.slug} has no url configured`);
 
-        const data = await res.json()
+      const res = await fetch(`${p.url.replace(/\/$/, '')}/api/report`, {
+        headers: { Authorization: `Bearer ${p.pullSecret}` },
+        cache: 'no-store',
+      });
 
-        await db
-          .update(provinces)
-          .set({
-            cachedScore:   data.score  ?? p.cachedScore,
-            cachedDetails: data,
-            cachedAt:      new Date(),
-            lastPulledAt:  new Date(),
-          })
-          .where(eq(provinces.id, p.id))
-
-        results.push({ slug: p.slug, ok: true })
-      } catch (err: any) {
-        results.push({ slug: p.slug, ok: false, error: err.message })
+      if (!res.ok) {
+        throw new Error(`${p.slug} responded ${res.status}`);
       }
-    })
-  )
 
-  return NextResponse.json({ pulled: results.length, results })
+      const payload = (await res.json()) as ProvinceReportPayload;
+      const now = new Date();
+      const details = {
+        ...(payload.details ?? {}),
+        streak: payload.streak,
+        todayDone: payload.todayDone,
+      };
+
+      await db
+        .update(provinces)
+        .set({
+          cachedScore: payload.score,
+          cachedDetails: details,
+          cachedAt: now,
+          lastPulledAt: now,
+        })
+        .where(eq(provinces.id, p.id));
+
+      await db
+        .insert(provinceDailySnapshots)
+        .values({ date, slug: p.slug, score: payload.score, details })
+        .onConflictDoUpdate({
+          target: [provinceDailySnapshots.date, provinceDailySnapshots.slug],
+          set: { score: payload.score, details },
+        });
+
+      return { slug: p.slug, score: payload.score };
+    })
+  );
+
+  const summary = results.map((r, i) => ({
+    slug: active[i].slug,
+    ok: r.status === 'fulfilled',
+    error: r.status === 'rejected' ? String(r.reason) : undefined,
+  }));
+
+  return NextResponse.json({ ranAt: new Date().toISOString(), summary });
 }
