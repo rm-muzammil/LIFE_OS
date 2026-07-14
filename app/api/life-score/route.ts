@@ -23,7 +23,7 @@ export async function GET() {
 
     const result = computeLifeScore(activeProvinces, character, review);
 
-    return NextResponse.json({ ...result, isoWeek: currentWeek });
+    return NextResponse.json({ ...result, isoWeek: currentWeek }, { headers: { 'Cache-Control': 'no-store, must-revalidate' } });
   } catch (err) {
     console.error('life-score GET error', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

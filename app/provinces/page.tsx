@@ -16,7 +16,7 @@ export default function ProvincesPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/provinces');
+    const res = await fetch('/api/provinces',{ cache: 'no-store' });
     const data = await res.json();
     setProvinces(data.provinces ?? []);
     setLoading(false);

@@ -29,8 +29,8 @@ export default function LifeScorePage() {
     async function load() {
       try {
         const [lsRes, hRes] = await Promise.all([
-          fetch('/api/life-score'),
-          fetch('/api/life-score/history'),
+          fetch('/api/life-score',{ cache: 'no-store' }),
+          fetch('/api/life-score/history',{ cache: 'no-store' }),
         ]);
         setData(await lsRes.json());
         const hData = await hRes.json();

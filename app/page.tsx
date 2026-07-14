@@ -18,8 +18,8 @@ export default function Dashboard() {
     async function load() {
       try {
         const [pRes, lsRes] = await Promise.all([
-          fetch('/api/provinces'),
-          fetch('/api/life-score'),
+          fetch('/api/provinces',{ cache: 'no-store' }),
+          fetch('/api/life-score',{ cache: 'no-store' }),
         ]);
         const pData = await pRes.json();
         const lsData = await lsRes.json();

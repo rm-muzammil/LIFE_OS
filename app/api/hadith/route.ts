@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const rows = await db.select().from(hadithLog).orderBy(desc(hadithLog.isoWeek));
-    return NextResponse.json({ weeks: rows });
+    return NextResponse.json({ weeks: rows }, { headers: { 'Cache-Control': 'no-store, must-revalidate' } });
   } catch (err) {
     console.error('hadith GET error', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

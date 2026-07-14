@@ -31,7 +31,10 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ provinces: result });
+    return NextResponse.json(
+  { provinces: result },
+  { headers: { 'Cache-Control': 'no-store, must-revalidate' } }
+);
   } catch (err) {
     console.error('provinces GET error', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

@@ -15,7 +15,7 @@ export default function HadithPage() {
   const currentWeek = isoWeekPKT();
 
   async function load() {
-    const res = await fetch('/api/hadith');
+    const res = await fetch('/api/hadith',{ cache: 'no-store' });
     const data = await res.json();
     const rows: HadithLog[] = data.weeks ?? [];
     setWeeks(rows);

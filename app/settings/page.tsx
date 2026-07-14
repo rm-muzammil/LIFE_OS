@@ -7,7 +7,7 @@ export default function SettingsPage() {
   const [provinces, setProvinces] = useState<ProvinceWithMeta[]>([]);
 
   useEffect(() => {
-    fetch('/api/provinces')
+    fetch('/api/provinces',{ cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => setProvinces(d.provinces ?? []));
   }, []);

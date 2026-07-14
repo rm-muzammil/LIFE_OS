@@ -50,7 +50,7 @@ export async function GET() {
       return { isoWeek: week, score };
     });
 
-    return NextResponse.json({ history });
+    return NextResponse.json({ history }, { headers: { 'Cache-Control': 'no-store, must-revalidate' } });
   } catch (err) {
     console.error('life-score/history GET error', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

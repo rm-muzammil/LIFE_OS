@@ -23,7 +23,7 @@ export default function ReviewPage() {
   const currentWeek = isoWeekPKT();
 
   async function load() {
-    const res = await fetch('/api/review');
+    const res = await fetch('/api/review',{ cache: 'no-store' });
     const data = await res.json();
     const rows: WeeklyReview[] = data.weeks ?? [];
     setWeeks(rows);
@@ -50,6 +50,7 @@ export default function ReviewPage() {
     setSaving(true);
     try {
       await fetch('/api/review', {
+        cache: 'no-store',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, isoWeek: currentWeek }),

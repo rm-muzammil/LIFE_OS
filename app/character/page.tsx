@@ -44,7 +44,8 @@ export default function CharacterPage() {
   async function save() {
     setSaving(true);
     try {
-      await fetch('/api/character', {
+      await fetch('/api/character',
+        { cache: 'no-store',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, isoWeek: currentWeek }),
