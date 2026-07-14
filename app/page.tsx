@@ -57,7 +57,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row items-center gap-8 card p-8">
         <ScoreRing score={lifeScore?.lifeScore ?? 0} label="Life Score" />
         <div className="flex-1 w-full space-y-2">
-          {lifeScore?.dimensions.map((d) => (
+         {(lifeScore?.dimensions ?? []).map((d) => (
             <div key={d.slug} className="flex items-center gap-3 text-sm">
               <span className="w-32 text-zinc-400 truncate">{d.name}</span>
               <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
