@@ -6,7 +6,6 @@ import BottomNav from '@/components/BottomNav';
 export const metadata: Metadata = {
   title: 'Self-Khilafah',
   description: 'Life governance kernel',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
