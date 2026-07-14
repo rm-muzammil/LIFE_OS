@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import ScoreRing from '@/components/ScoreRing';
 import ProvinceCard from '@/components/ProvinceCard';
 import type { ProvinceWithMeta } from '@/lib/types';
@@ -13,24 +13,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
 
+  const load = useCallback(async () => {
+    try {
+      const [pRes, lsRes] = await Promise.all([
+        fetch('/api/provinces', { cache: 'no-store' }),
+        fetch('/api/life-score', { cache: 'no-store' }),
+      ]);
+      const pData = await pRes.json();
+      const lsData = await lsRes.json();
+      setProvinces(pData.provinces ?? []);
+      setLifeScore(lsData);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     setNow(new Date());
-    async function load() {
-      try {
-        const [pRes, lsRes] = await Promise.all([
-          fetch('/api/provinces',{ cache: 'no-store' }),
-          fetch('/api/life-score',{ cache: 'no-store' }),
-        ]);
-        const pData = await pRes.json();
-        const lsData = await lsRes.json();
-        setProvinces(pData.provinces ?? []);
-        setLifeScore(lsData);
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
-  }, []);
+
+    // Refetch when tab regains focus — catches pushes from province apps
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, [load]);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -57,37 +62,34 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row items-center gap-8 card p-8">
         <ScoreRing score={lifeScore?.lifeScore ?? 0} label="Life Score" />
         <div className="flex-1 w-full space-y-2">
-         {(lifeScore?.dimensions ?? []).map((d) => (
-            <div key={d.slug} className="flex items-center gap-3 text-sm">
-              <span className="w-32 text-zinc-400 truncate">{d.name}</span>
-              <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+          {(lifeScore?.dimensions ?? []).map((d) => (
+  <div key={d.slug} className="flex items-center gap-2">
+    <span className="text-xs text-zinc-500 w-24 shrink-0">{d.name}</span>
+              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-brand-500 rounded-full transition-all"
+                  className="h-full bg-brand-500 rounded-full transition-all duration-500"
                   style={{ width: `${d.score ?? 0}%` }}
                 />
               </div>
-              <span className="w-10 text-right text-zinc-500 tabular-nums">
-                {d.score != null ? Math.round(d.score) : '—'}
-              </span>
+                <span className="text-xs text-zinc-400 w-8 text-right">{Math.round(d.score ?? 0)}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <section>
-        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-          Provinces
-        </h2>
-        {loading ? (
-          <p className="text-zinc-600 text-sm">Loading…</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {provinces.map((p) => (
-              <ProvinceCard key={p.slug} province={p} />
-            ))}
-          </div>
-        )}
-      </section>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="card p-5 h-32 animate-pulse bg-zinc-900" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {provinces.map((p) => (
+            <ProvinceCard key={p.id} province={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

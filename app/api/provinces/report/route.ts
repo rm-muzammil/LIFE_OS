@@ -6,6 +6,8 @@ import { verifyApiKey } from '@/lib/auth';
 import { todayPKT } from '@/lib/time';
 import type { ProvinceReportPayload } from '@/lib/types';
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   try {
     const apiKey = req.headers.get('x-api-key');
