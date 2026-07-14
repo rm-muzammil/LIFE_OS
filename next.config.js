@@ -6,6 +6,12 @@ const withPWA = require('next-pwa')({
   fallbacks: {
     document: '/offline',
   },
+  runtimeCaching: [
+    {
+      urlPattern: /^\/api\/.*/,
+      handler: 'NetworkOnly',
+    },
+  ],
 });
 
 /** @type {import('next').NextConfig} */
