@@ -10,6 +10,7 @@ const withPWA = require('next-pwa')({
     {
       urlPattern: /^\/api\/.*/,
       handler: 'NetworkOnly',
+      options: {},
     },
   ],
 });
