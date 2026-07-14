@@ -4,6 +4,8 @@ import { provinces } from '@/db/schema';
 import { isStale } from '@/lib/time';
 import type { ProvinceWithMeta } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const rows = await db.select().from(provinces).orderBy(provinces.createdAt);

@@ -4,6 +4,8 @@ import { provinces, provinceDailySnapshots } from '@/db/schema';
 import { eq, gte } from 'drizzle-orm';
 import { isoWeekPKT } from '@/lib/time';
 
+export const dynamic = 'force-dynamic';
+
 // Approximates a historical weighted life score per ISO week using
 // province_daily_snapshots (character/mission internal scores are not
 // backfilled historically, so only the province-weighted portion is shown).

@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { computeLifeScore } from '@/lib/life-score';
 import { isoWeekPKT } from '@/lib/time';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const activeProvinces = await db.select().from(provinces).where(eq(provinces.active, true));

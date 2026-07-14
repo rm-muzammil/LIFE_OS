@@ -4,6 +4,8 @@ import { characterRatings } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { isoWeekPKT } from '@/lib/time';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const rows = await db.select().from(characterRatings).orderBy(desc(characterRatings.isoWeek));
