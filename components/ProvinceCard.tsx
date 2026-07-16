@@ -4,7 +4,7 @@ import { Flame, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
 
 export default function ProvinceCard({ province }: { province: ProvinceWithMeta }) {
-  const neverPushed = !province.lastPushedAt;
+const neverPushed = province.cachedScore == null;
 
   return (
     <div className="card card-hover p-5 flex flex-col gap-3">
