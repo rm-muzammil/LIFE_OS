@@ -10,15 +10,11 @@ import {
   BookOpen,
   Building2,
   Settings,
-  CalendarDays,
-  MessageCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/life-score', label: 'Life Score', icon: TrendingUp },
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Weekly Review', icon: NotebookPen },

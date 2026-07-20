@@ -50,6 +50,16 @@ export function isoWeekPKT(date?: Date): string {
   return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
+/** True if the given timestamp's PKT calendar date IS today. Used to detect
+ *  "this province hasn't reported yet today" regardless of hour-of-day drift,
+ *  which matters on Vercel Hobby where cron only fires within an hour window. */
+export function isFromToday(date: string | Date | null): boolean {
+  if (!date) return false;
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const dDatePKT = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
+  return dDatePKT === todayPKT();
+}
+
 export function isStale(lastPushedAt: string | Date | null, hours = 24): boolean {
   if (!lastPushedAt) return true;
   const last = typeof lastPushedAt === 'string' ? new Date(lastPushedAt) : lastPushedAt;

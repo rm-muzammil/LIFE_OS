@@ -2,21 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  TrendingUp,
-  Heart,
-  NotebookPen,
-  Building2,
-  CalendarDays,
-  MessageCircle,
-} from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Heart, NotebookPen, Building2 } from 'lucide-react';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: LayoutDashboard },
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/life-score', label: 'Score', icon: TrendingUp },
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Review', icon: NotebookPen },
@@ -28,7 +18,7 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-zinc-950/95 backdrop-blur border-t border-zinc-900 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center h-16 overflow-x-auto">
+      <div className="flex justify-around items-center h-16">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -36,7 +26,7 @@ export default function BottomNav() {
               key={href}
               href={href}
               className={clsx(
-                'flex flex-col items-center justify-center gap-1 h-full min-w-[64px] shrink-0 px-1 text-[10px] font-medium transition-colors',
+                'flex flex-col items-center justify-center gap-1 flex-1 h-full text-[10px] font-medium transition-colors',
                 active ? 'text-brand-400' : 'text-zinc-600'
               )}
             >

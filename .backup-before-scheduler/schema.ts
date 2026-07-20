@@ -86,44 +86,6 @@ export const hadithLog = pgTable('hadith_log', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─────────────────────────────────────────────────────────────
-// 6. daily_schedule — AI-generated schedule, one row per PKT day
-// ─────────────────────────────────────────────────────────────
-export const dailySchedule = pgTable('daily_schedule', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  date: date('date').notNull().unique(), // PKT date YYYY-MM-DD
-  userNotes: text('user_notes').notNull().default(''), // combined chat notes fed to AI
-  tasks: jsonb('tasks').notNull(), // ScheduledTask[] — see lib/types.ts
-  generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
-  status: text('status').notNull().default('active'), // 'active' | 'completed'
-  generationError: text('generation_error'), // set if Gemini failed; tasks stays []
-});
-
-// ─────────────────────────────────────────────────────────────
-// 7. chat_messages — persistent chat, shared web + Android
-// ─────────────────────────────────────────────────────────────
-export const chatMessages = pgTable('chat_messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  role: text('role').notNull(), // 'user' | 'assistant'
-  content: text('content').notNull(),
-  date: date('date').notNull(), // PKT date (for daily context grouping)
-  feedsSchedule: boolean('feeds_schedule').notNull().default(true), // include in tomorrow's prompt
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ─────────────────────────────────────────────────────────────
-// 8. prayer_times — single-row, user-configured
-// ─────────────────────────────────────────────────────────────
-export const prayerTimes = pgTable('prayer_times', {
-  id: serial('id').primaryKey(),
-  fajr: text('fajr').notNull().default('05:20'),
-  dhuhr: text('dhuhr').notNull().default('13:00'),
-  asr: text('asr').notNull().default('16:45'),
-  maghrib: text('maghrib').notNull().default('19:30'),
-  isha: text('isha').notNull().default('21:00'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -133,10 +95,3 @@ export type WeeklyReview = typeof weeklyReview.$inferSelect;
 export type NewWeeklyReview = typeof weeklyReview.$inferInsert;
 export type HadithLog = typeof hadithLog.$inferSelect;
 export type NewHadithLog = typeof hadithLog.$inferInsert;
-
-export type DailySchedule = typeof dailySchedule.$inferSelect;
-export type NewDailySchedule = typeof dailySchedule.$inferInsert;
-export type ChatMessageRow = typeof chatMessages.$inferSelect;
-export type NewChatMessageRow = typeof chatMessages.$inferInsert;
-export type PrayerTimesRow = typeof prayerTimes.$inferSelect;
-export type NewPrayerTimesRow = typeof prayerTimes.$inferInsert;
