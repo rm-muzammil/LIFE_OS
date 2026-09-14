@@ -1,0 +1,42 @@
+{
+  "name": "self-khilafah",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_OPTIONS='--dns-result-order=ipv4first' next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@life-os/db": "workspace:*",
+    "@neondatabase/serverless": "^0.9.5",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
+    "drizzle-orm": "^0.33.0",
+    "lucide-react": "^0.427.0",
+    "next": "^14.2.35",
+    "next-auth": "^4.24.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.15",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "babel-loader": "^10.1.1",
+    "dotenv": "^16.4.5",
+    "drizzle-kit": "^0.24.2",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4"
+  }
+}

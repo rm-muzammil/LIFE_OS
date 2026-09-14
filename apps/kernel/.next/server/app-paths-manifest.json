@@ -1,0 +1,7 @@
+{
+  "/api/provinces/route": "app/api/provinces/route.js",
+  "/api/life-score/route": "app/api/life-score/route.js",
+  "/page": "app/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/provinces/page": "app/provinces/page.js"
+}

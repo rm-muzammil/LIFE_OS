@@ -37,3 +37,9 @@ next-env.d.ts
 /public/sw.js.map
 /public/workbox-*.js.map
 /public/worker-*.js.map
+
+# Turborepo
+.turbo
+
+# Monorepo dependencies
+node_modules

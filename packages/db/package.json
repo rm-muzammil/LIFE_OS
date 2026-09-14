@@ -1,0 +1,15 @@
+{
+  "name": "@life-os/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.5",
+    "drizzle-orm": "^0.33.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.24.2",
+    "typescript": "^5.9.3"
+  }
+}
