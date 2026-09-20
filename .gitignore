@@ -42,4 +42,7 @@ next-env.d.ts
 .turbo
 
 # Monorepo dependencies
-node_modules
+node_modules.next/
+node_modules/
+dist/
+build/
