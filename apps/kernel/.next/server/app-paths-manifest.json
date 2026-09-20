@@ -1,7 +1,11 @@
 {
-  "/api/provinces/route": "app/api/provinces/route.js",
-  "/api/life-score/route": "app/api/life-score/route.js",
   "/page": "app/page.js",
+  "/api/provinces/route": "app/api/provinces/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/provinces/page": "app/provinces/page.js"
+  "/auth/signin/page": "app/auth/signin/page.js",
+  "/provinces/page": "app/provinces/page.js",
+  "/api/provinces/report/route": "app/api/provinces/report/route.js",
+  "/api/life-score/route": "app/api/life-score/route.js",
+  "/api/review/route": "app/api/review/route.js",
+  "/review/page": "app/review/page.js"
 }

@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { provinces, provinceDailySnapshots } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-import { verifyApiKey } from '@/lib/auth';
+import { eq, and } from 'drizzle-orm';
+import { timingSafeEqualStrings } from '@/lib/auth';
 import { todayPKT } from '@/lib/time';
 import type { ProvinceReportPayload } from '@/lib/types';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
     const apiKey = req.headers.get('x-api-key');
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Missing X-Api-Key header' }, { status: 401 });
+    const sharedKey = process.env.PROVINCE_SHARED_API_KEY;
+
+    if (!sharedKey) {
+      // Fail closed rather than silently accepting any key if this is unset.
+      console.error('provinces/report: PROVINCE_SHARED_API_KEY is not configured');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+    if (!apiKey || !timingSafeEqualStrings(apiKey, sharedKey)) {
+      return NextResponse.json({ error: 'Invalid API key' }, { status: 403 });
     }
 
     const body = (await req.json()) as ProvinceReportPayload;
     if (
+      typeof body.userId !== 'string' ||
+      !body.userId ||
       typeof body.score !== 'number' ||
       typeof body.label !== 'string' ||
       typeof body.streak !== 'number' ||
@@ -26,31 +35,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Malformed report payload' }, { status: 400 });
     }
 
-    // Find province by label -> slug match (case-insensitive) since push doesn't include slug.
-    // Slugs are only unique per-user now, so this may match multiple rows across
-    // different users' deployments — apiKey verification below picks the real one.
+    // One shared key authenticates every province app for every user now, so
+    // the only thing scoping this push to the right person is the userId the
+    // caller sends — the province app is trusted to send its own configured
+    // userId correctly. See README for the tradeoff this introduces.
     const slug = body.label.toLowerCase().trim();
-    const candidates = await db.select().from(provinces).where(eq(provinces.slug, slug));
-
-    if (candidates.length === 0) {
-      return NextResponse.json({ error: `Unknown province slug '${slug}'` }, { status: 404 });
-    }
-
-    let province: (typeof candidates)[number] | undefined;
-    for (const candidate of candidates) {
-      if (await verifyApiKey(apiKey, candidate.apiKeyHash)) {
-        province = candidate;
-        break;
-      }
-    }
+    const [province] = await db
+      .select()
+      .from(provinces)
+      .where(and(eq(provinces.userId, body.userId), eq(provinces.slug, slug)));
 
     if (!province) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+      return NextResponse.json({ error: `Province '${slug}' not found for this user` }, { status: 404 });
     }
-
-    // No session on this route — it's called by province apps, not the browser.
-    // The verified province row tells us which user this push belongs to.
-    const userId = province.userId;
 
     const now = new Date();
     const details = {
@@ -73,7 +70,7 @@ export async function POST(req: NextRequest) {
     const date = todayPKT();
     await db
       .insert(provinceDailySnapshots)
-      .values({ userId, date, slug: province.slug, score: body.score, details })
+      .values({ userId: body.userId, date, slug: province.slug, score: body.score, details })
       .onConflictDoUpdate({
         target: [provinceDailySnapshots.userId, provinceDailySnapshots.date, provinceDailySnapshots.slug],
         set: { score: body.score, details },

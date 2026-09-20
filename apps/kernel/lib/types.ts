@@ -1,4 +1,5 @@
 export interface ProvinceReportPayload {
+  userId: string;
   score: number;
   label: string;
   streak: number;

@@ -2,6 +2,8 @@ import { neon, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
+export * from './schema';
+
 neonConfig.fetchFunction = (url: string, init: RequestInit) =>
   fetch(url, { ...init, cache: 'no-store' });
 

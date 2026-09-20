@@ -1,5 +1,6 @@
 import type { AuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import { ensureDefaultProvinces } from '@/lib/default-provinces';
 
 // No allowlist — any Google account can sign in. Data is fully isolated
 // per-user via userId columns (see db/schema.ts), so an open sign-up is safe.
@@ -16,6 +17,15 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      // user.id here is the Google `sub` (next-auth's built-in Google
+      // provider maps profile.sub -> id), matching what the session
+      // callback below later exposes as session.user.id.
+      if (user.id) {
+        await ensureDefaultProvinces(user.id);
+      }
+      return true;
+    },
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub!;

@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
       if (!p.url) throw new Error(`${p.slug} has no url configured`);
 
       const res = await fetch(`${p.url.replace(/\/$/, '')}/api/report`, {
-        headers: { Authorization: `Bearer ${p.pullSecret}` },
+        headers: {
+          Authorization: `Bearer ${p.pullSecret}`,
+          'X-User-Id': p.userId,
+        },
         cache: 'no-store',
       });
 

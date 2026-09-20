@@ -43,53 +43,91 @@ Open http://localhost:3000 — you'll be redirected to sign in with Google first
 Each user manages their own Gemini API keys on the **Settings** page — if they leave
 those blank, generation falls back to the shared `GEMINI_API_KEY_1/2/3` env vars.
 
-## Registering your provinces
+## Provinces: shared key architecture
 
-Go to `/provinces` in the app (once signed in) and click **New** for each province.
-Provinces are scoped to your account — friends using the same deployment each
-register and see only their own.
+Provinces are now **auto-registered on first sign-in** — the 6 defaults (Faith,
+Personal, Wealth, Roadmap, Relationships, Work) are created automatically the first
+time someone signs in with Google (see `lib/default-provinces.ts` and the `signIn`
+callback in `lib/auth-options.ts`). No manual registration step, no per-user API keys.
 
-| Name          | Slug            | URL                                         | Weight |
-|---------------|-----------------|----------------------------------------------|--------|
-| Faith         | faith           | https://faithtracker.vercel.app              | 0.25   |
-| Personal      | personal        | https://personal-app.vercel.app              | 0.20   |
-| Wealth        | wealth          | https://wealth-app-eta.vercel.app            | 0.15   |
-| Roadmap       | roadmap         | https://life-os-chi-ecru.vercel.app          | 0.15   |
-| Relationships | relationships   | (your deployed URL)                          | 0.10   |
-| Work          | work            | (your deployed URL)                          | 0.10   |
+| Name          | Slug            | URL                                            | Weight |
+|---------------|-----------------|-------------------------------------------------|--------|
+| Faith         | faith           | https://faithtracker.vercel.app                 | 0.25   |
+| Personal      | personal        | https://personal-blush-zeta.vercel.app          | 0.20   |
+| Wealth        | wealth          | https://wealth-app-eta.vercel.app               | 0.15   |
+| Roadmap       | roadmap         | https://life-os-chi-ecru.vercel.app             | 0.15   |
+| Relationships | relationships   | https://your-relationships-app.vercel.app       | 0.10   |
+| Work          | work            | https://work-app-azure.vercel.app               | 0.10   |
 
-**The slug must exactly match the lowercase `label` each province sends in its push
-payload** (e.g. a province pushing `"label": "Faith"` is matched against slug `faith`).
-Slugs only need to be unique per-account now — two different users can each register
-a province called `faith` without conflicting.
+Update the URLs in `lib/default-provinces.ts` to match your actual deployed province
+apps before anyone signs in — those are baked in at provisioning time, though you can
+always edit a province's URL later directly in the database (there's no UI for it
+currently, since the `/provinces` page treats the URL as read-only).
 
-After registering, you'll see the generated `X-Api-Key` and `Pull Secret` **once** —
-copy them into that province app's environment variables immediately:
+**Push (province → SK):** every province app now shares **one** API key —
+`PROVINCE_SHARED_API_KEY` — instead of a unique key per user. A province app
+identifies whose data it's pushing via a `userId` field in the request body:
 
-- The province app should send `X-Api-Key: {rawApiKey}` when it `POST`s to
-  `/api/provinces/report` on this app.
-- This app sends `Authorization: Bearer {pullSecret}` when it pulls from
-  `{province.url}/api/report` — your province app should verify that secret.
-- `/api/provinces/report` has no session — it authenticates by API key, then reads
-  which user the push belongs to off the verified province row.
-
-Alternatively, run the seed script against a running instance to register all 6 at once
-(update the two placeholder URLs first). Since registration now requires a signed-in
-session, sign in in your browser first and pass your session cookie:
-
-```bash
-BASE_URL=http://localhost:3000 \
-SESSION_COOKIE="next-auth.session-token=..." \
-npx tsx scripts/seed-provinces.ts
+```json
+POST /api/provinces/report
+X-Api-Key: {PROVINCE_SHARED_API_KEY}
+{
+  "userId": "<the Self-Khilafah user's Google sub>",
+  "score": 82,
+  "label": "Faith",
+  "streak": 4,
+  "todayDone": true,
+  "updatedAt": "2026-09-18T12:00:00Z"
+}
 ```
+
+**Pull (SK → province):** unchanged in mechanism, but now also sends `X-User-Id` so a
+single province app deployment can serve multiple people:
+
+```
+GET {province.url}/api/report
+Authorization: Bearer {province.pullSecret}   — still unique per user
+X-User-Id: {userId}
+```
+
+**Security tradeoff worth knowing:** because the push side now uses one shared secret
+across every user and every province, `userId` in the push body is trusted at face
+value — there's no per-request proof that the caller actually owns that user. A
+province app (or anyone who obtains `PROVINCE_SHARED_API_KEY`) could push fabricated
+data for a `userId` it can guess. The blast radius is limited by two things: the key
+never leaves your own province apps' env vars, and a push only succeeds if the
+`(userId, slug)` pair already exists as a province — so an attacker also needs a valid
+Google account ID for a real user of this deployment. For a small group of friends
+running their own province apps, this is a reasonable tradeoff for not managing 6+
+per-user keys; it would need per-user keys again (the previous architecture) if this
+ever opened up beyond people you trust.
+
+**Adding a custom province beyond the 6 defaults:** `POST /api/provinces/register`
+still exists and still works (session-based) — it creates a province row with an
+unused, vestigial bcrypt `apiKeyHash` (the report route no longer checks it at all,
+only the shared key), so it's really just a way to add an extra province slug/URL/weight
+to your account. `scripts/seed-provinces.ts` is now redundant for the default 6 (they're
+auto-created) but still works for bulk-registering custom ones if you script around it.
+
+**Resetting to defaults:** the "Reset to defaults" button on `/provinces` deletes every
+province you currently have (including custom ones) and recreates the 6 defaults fresh
+— see `lib/default-provinces.ts:resetToDefaultProvinces` for exactly what happens to
+your existing life-score history when you do this.
+
+**Migrating province apps that already had a unique key:** if you deployed this before
+the shared-key change, each of your province apps is currently configured with its own
+per-user `X-Api-Key`. Those stop working the moment this update ships — update every
+province app's env var to the new single `PROVINCE_SHARED_API_KEY`, and add your Google
+`sub` as a `userId` field in whatever request body it sends to `/api/provinces/report`.
 
 ## Deploying to Vercel
 
 1. Push this repo to GitHub.
 2. Import into Vercel.
 3. Add environment variables: `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`,
-   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SCHEDULER_API_SECRET`, and optionally
-   `CRON_SECRET` and shared-fallback `GEMINI_API_KEY_1/2/3`.
+   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SCHEDULER_API_SECRET`,
+   `PROVINCE_SHARED_API_KEY`, and optionally `CRON_SECRET` and shared-fallback
+   `GEMINI_API_KEY_1/2/3`.
 4. Vercel will pick up `vercel.json`'s crons: a daily pull at 18:00 UTC
    (`/api/cron/pull-provinces`), then schedule generation at 19:00 UTC with a
    20:00 UTC retry (`/api/cron/generate-schedule`, twice) — the retry is a no-op

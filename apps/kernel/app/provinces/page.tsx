@@ -1,22 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Copy, Check, Trash2, Plus, X } from 'lucide-react';
+import { Trash2, RotateCcw, X } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
 
 export default function ProvincesPage() {
   const [provinces, setProvinces] = useState<ProvinceWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [newKeys, setNewKeys] = useState<{ rawApiKey: string; pullSecret: string; slug: string } | null>(
-    null
-  );
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', slug: '', url: '', weight: 0.1 });
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/provinces',{ cache: 'no-store' });
+    const res = await fetch('/api/provinces', { cache: 'no-store' });
     const data = await res.json();
     setProvinces(data.provinces ?? []);
     setLoading(false);
@@ -25,23 +22,6 @@ export default function ProvincesPage() {
   useEffect(() => {
     load();
   }, []);
-
-  async function register() {
-    const res = await fetch('/api/provinces/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setNewKeys({ rawApiKey: data.rawApiKey, pullSecret: data.pullSecret, slug: form.slug });
-      setForm({ name: '', slug: '', url: '', weight: 0.1 });
-      setShowForm(false);
-      load();
-    } else {
-      alert(data.error ?? 'Failed to register province');
-    }
-  }
 
   async function updateWeight(slug: string, weight: number) {
     await fetch(`/api/provinces/${slug}`, {
@@ -67,15 +47,31 @@ export default function ProvincesPage() {
     load();
   }
 
+  async function resetToDefaults() {
+    setResetting(true);
+    try {
+      await fetch('/api/provinces/reset', { method: 'POST' });
+      setConfirmReset(false);
+      await load();
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Provinces</h1>
-          <p className="text-sm text-zinc-500 mt-1">Manage the 6 provinces reporting into Self-Khilafah</p>
+          <p className="text-sm text-zinc-500 mt-1">
+            Auto-registered on sign-in. Adjust weights and active status below.
+          </p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> New
+        <button
+          onClick={() => setConfirmReset(true)}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <RotateCcw size={16} /> Reset to defaults
         </button>
       </header>
 
@@ -172,94 +168,36 @@ export default function ProvincesPage() {
         </div>
       )}
 
-      {showForm && (
+      {confirmReset && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-md space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Register Province</h2>
-              <button onClick={() => setShowForm(false)}>
+              <h2 className="font-semibold text-red-400">Reset to defaults?</h2>
+              <button onClick={() => setConfirmReset(false)}>
                 <X size={18} className="text-zinc-500" />
               </button>
             </div>
-            <div>
-              <label className="label">Name</label>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
+            <p className="text-sm text-zinc-400">
+              This deletes every province you currently have — including any custom ones you added —
+              and recreates the 6 defaults (Faith, Personal, Wealth, Roadmap, Relationships, Work).
+              Past life-score history for the 6 default provinces is preserved; a custom province's
+              history is not.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmReset(false)} className="btn-secondary flex-1">
+                Cancel
+              </button>
+              <button
+                onClick={resetToDefaults}
+                disabled={resetting}
+                className="flex-1 rounded-xl bg-red-500 text-white font-medium px-4 py-2 hover:bg-red-400 transition-colors disabled:opacity-50"
+              >
+                {resetting ? 'Resetting…' : 'Reset'}
+              </button>
             </div>
-            <div>
-              <label className="label">Slug</label>
-              <input
-                className="input"
-                value={form.slug}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">URL</label>
-              <input
-                className="input"
-                value={form.url}
-                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Weight (0–1)</label>
-              <input
-                type="number"
-                step={0.01}
-                min={0}
-                max={1}
-                className="input"
-                value={form.weight}
-                onChange={(e) => setForm((f) => ({ ...f, weight: Number(e.target.value) }))}
-              />
-            </div>
-            <button onClick={register} className="btn-primary w-full">
-              Register
-            </button>
           </div>
         </div>
       )}
-
-      {newKeys && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md space-y-4">
-            <h2 className="font-semibold text-brand-400">
-              Credentials for {newKeys.slug} — copy now, shown once
-            </h2>
-            <CopyField label="X-Api-Key (push)" value={newKeys.rawApiKey} />
-            <CopyField label="Pull Secret (Bearer)" value={newKeys.pullSecret} />
-            <button onClick={() => setNewKeys(null)} className="btn-secondary w-full">
-              I've copied these — Close
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CopyField({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div>
-      <label className="label">{label}</label>
-      <div className="flex items-center gap-2">
-        <code className="input text-xs break-all">{value}</code>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(value);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-          className="btn-secondary shrink-0 px-3"
-        >
-          {copied ? <Check size={16} /> : <Copy size={16} />}
-        </button>
-      </div>
     </div>
   );
 }

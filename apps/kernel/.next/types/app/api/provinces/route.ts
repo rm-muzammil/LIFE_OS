@@ -1,4 +1,4 @@
-// File: /home/rm/projects/life-os/Kernel/app/api/provinces/route.ts
+// File: /home/rm/projects/life-os/apps/kernel/app/api/provinces/route.ts
 import * as entry from '../../../../../app/api/provinces/route.js'
 import type { NextRequest } from 'next/server.js'
 

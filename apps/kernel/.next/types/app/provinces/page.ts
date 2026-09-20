@@ -1,4 +1,4 @@
-// File: /home/rm/projects/life-os/Kernel/app/provinces/page.tsx
+// File: /home/rm/projects/life-os/apps/kernel/app/provinces/page.tsx
 import * as entry from '../../../../app/provinces/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

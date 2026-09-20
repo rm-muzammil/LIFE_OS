@@ -22,6 +22,19 @@ export function generatePullSecret(): string {
   return crypto.randomBytes(24).toString('hex');
 }
 
+/**
+ * Constant-time string comparison — used for the shared PROVINCE_SHARED_API_KEY
+ * check in /api/provinces/report, since that's now a single static secret
+ * (not a per-user bcrypt hash) and a naive `===` would leak timing information
+ * about how many leading characters matched.
+ */
+export function timingSafeEqualStrings(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 // ─────────────────────────────────────────────────────────────
 // Session-based auth (Google OAuth via next-auth) — used to scope every
 // user's data by userId. The apiKey helpers above are unrelated and stay
