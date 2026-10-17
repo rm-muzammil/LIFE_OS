@@ -49,3 +49,6 @@ build/
 
 # Monorepo: build output inside apps/* (root-anchored rules above miss these)
 .next/
+**/public/sw.js
+**/public/workbox-*.js
+**/public/fallback-*.js
