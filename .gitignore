@@ -46,3 +46,6 @@ node_modules.next/
 node_modules/
 dist/
 build/
+
+# Monorepo: build output inside apps/* (root-anchored rules above miss these)
+.next/

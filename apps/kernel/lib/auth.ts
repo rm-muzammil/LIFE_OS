@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import jwt from 'jsonwebtoken';
 import { authOptions } from '@/lib/auth-options';
 
 const SALT_ROUNDS = 10;
@@ -61,8 +63,29 @@ export async function getUserId(): Promise<string> {
 /**
  * For API routes — returns null instead of redirecting so the caller can
  * return a proper `{ error: 'Unauthorized' }` 401 JSON response.
+ *
+ * Checks two things, in order:
+ *  1. A next-auth session cookie (browser / web app requests).
+ *  2. An app-issued mobile JWT sent as `Authorization: Bearer <token>` (the
+ *     Kotlin/Android app — see /api/mobile-auth for how it gets this token).
+ *     The mobile token's `sub` claim is the same Google `sub` used
+ *     everywhere else as userId, so both paths resolve to the exact same
+ *     identity and every existing route works for both clients unchanged.
  */
 export async function getApiUserId(): Promise<string | null> {
   const session = await getServerSession(authOptions);
-  return session?.user?.id ?? null;
+  if (session?.user?.id) return session.user.id;
+
+  const authHeader = headers().get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length);
+    try {
+      const decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET!) as { sub?: string };
+      if (decoded.sub) return decoded.sub;
+    } catch {
+      // Invalid, expired, or forged mobile token — fall through to null.
+    }
+  }
+
+  return null;
 }
