@@ -15,7 +15,7 @@ export interface HijriDate {
   dayName: string;
   formatted: string;
   formattedAr: string;
-  source: "api" | "calculated";
+  source: "api" | "calculated" | "manual";
 }
 
 const HIJRI_MONTHS = [
@@ -138,6 +138,28 @@ function calculateHijri(date: Date): HijriDate {
   };
 }
 
+function makeHijriDate(
+  day: number,
+  month: number,
+  year: number,
+  date: Date,
+  source: "manual"
+): HijriDate {
+  const monthData = HIJRI_MONTHS[month - 1] ?? HIJRI_MONTHS[0];
+
+  return {
+    day,
+    month,
+    year,
+    monthName: monthData.en,
+    monthNameAr: monthData.ar,
+    dayName: DAY_NAMES[date.getDay()],
+    formatted: `${day} ${monthData.en} ${year}`,
+    formattedAr: `${day} ${monthData.ar} ${year}`,
+    source,
+  };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -145,7 +167,22 @@ function calculateHijri(date: Date): HijriDate {
  * Reads hijri_adjustment from settings DB (default -1).
  * Call this in Server Components / API routes only.
  */
-export async function getHijriDate(date: Date = new Date()): Promise<HijriDate> {
+export async function getHijriDate(
+  date: Date = new Date(),
+  settingMap?: Record<string, string>
+): Promise<HijriDate> {
+
+    if (settingMap) {
+    const dateKey = date.toISOString().slice(0, 10);
+    const override = settingMap[`hijri_override_${dateKey}`];
+    if (override) {
+      const [day, month, year] = override.split("-").map(Number);
+      if (day && month && year) {
+        return makeHijriDate(day, month, year, date, "manual");
+      }
+    }
+  }
+  
   const adjustment = await getHijriAdjustment()
   const fromApi = await fetchFromAladhan(date, adjustment)
   if (fromApi) return fromApi

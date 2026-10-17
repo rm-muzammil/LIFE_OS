@@ -14,12 +14,14 @@ interface Props {
   initialCount?: number;
   initialCompleted?: boolean;
   colorClass?: string;
+  onUpdate?: (key: string, count: number, completed: boolean) => void;
 }
 
 export function DhikrCounter({
   dhikrKey, arabic, transliteration, translation, target,
   benefit, date, initialCount = 0, initialCompleted = false,
   colorClass = "brand",
+   onUpdate, 
 }: Props) {
   const [count, setCount] = useState(initialCount);
   const [completed, setCompleted] = useState(initialCompleted);
@@ -48,6 +50,7 @@ export function DhikrCounter({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, dhikrKey, count: c, target }),
       });
+      onUpdate?.(dhikrKey, c, c >= target); 
     } finally {
       setSaving(false);
     }
@@ -136,25 +139,22 @@ export function DhikrCounter({
       {/* Quick +10 buttons for faster counting */}
       {!completed && (
         <div className="flex gap-2 justify-center">
-          {[5, 10, 25].map((n) => (
-            <button
-              key={n}
-              onClick={() => {
-                const next = Math.min(count + n, target);
-                setCount(next);
-                if (next >= target) {
-                  setCompleted(true);
-                  save(next);
-                } else {
-                  if (saveTimer.current) clearTimeout(saveTimer.current);
-                  saveTimer.current = setTimeout(() => save(next), 800);
-                }
-              }}
-              className="btn-ghost text-xs py-1 px-3"
-            >
-              +{n}
-            </button>
-          ))}
+{[5, 10, 25].map((n) => (
+  <button
+    key={n}
+    onClick={() => {
+      const next = Math.min(count + n, target);
+      setCount(next);
+      const done = next >= target;
+      if (done) setCompleted(true);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => save(next), 800);
+    }}
+    className="btn-ghost text-xs py-1 px-3"
+  >
+    +{n}
+  </button>
+))}
         </div>
       )}
     </div>

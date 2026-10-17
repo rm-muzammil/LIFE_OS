@@ -1,19 +1,22 @@
 import { db } from "@/db";
-import { dailyLog } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { dailyLog, settings } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { isActivityGreen } from "@/lib/scoring";
 import { DashboardClient } from "./DashboardClient";
 import { getHijriDate } from "@/lib/hijri";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-options";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function fetchDashboardData(today: string, attempt = 1) {
+async function fetchDashboardData(userId: string, today: string, attempt = 1) {
   try {
     const [existing] = await db
       .select()
       .from(dailyLog)
-      .where(eq(dailyLog.date, today))
+      .where(and(eq(dailyLog.userId, userId), eq(dailyLog.date, today)))
       .limit(1);
 
     const recentLogs = await db
@@ -31,6 +34,7 @@ async function fetchDashboardData(today: string, attempt = 1) {
         finalScore: dailyLog.finalScore,
       })
       .from(dailyLog)
+      .where(eq(dailyLog.userId, userId))
       .orderBy(dailyLog.date);
 
     const activityData = recentLogs.map((r) => ({
@@ -52,19 +56,26 @@ async function fetchDashboardData(today: string, attempt = 1) {
   } catch (err) {
     if (attempt < 3) {
       await new Promise((r) => setTimeout(r, 1500 * attempt));
-      return fetchDashboardData(today, attempt + 1);
+      return fetchDashboardData(userId, today, attempt + 1);
     }
     throw err;
   }
 }
 
 export default async function DashboardPage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as { id?: string })?.id;
+  if (!userId) redirect("/auth/signin");
 
-  // Fetch DB data and Hijri date in parallel
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Karachi" });
+
+  // Load settings for Hijri override
+  const settingRows = await db.select().from(settings).where(eq(settings.userId, userId));
+  const settingMap = Object.fromEntries(settingRows.map((s) => [s.key, s.value]));
+
   const [{ existing, activityData, streak }, hijri] = await Promise.all([
-    fetchDashboardData(today),
-    getHijriDate(new Date()),
+    fetchDashboardData(userId, today),
+    getHijriDate(new Date(), settingMap),
   ]);
 
   return (
@@ -76,7 +87,7 @@ export default async function DashboardPage() {
       hijriFormatted={hijri.formatted}
       hijriFormattedAr={hijri.formattedAr}
       hijriDayName={hijri.dayName}
-      hijriSource={hijri.source}
+      hijriSource={hijri.source === "manual" ? "calculated" : hijri.source}
     />
   );
 }

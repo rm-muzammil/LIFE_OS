@@ -83,7 +83,7 @@ export function AdhkarPageClient({ title, titleAr, subtitle, items, today, initi
               date={today}
               initialCount={c?.count ?? 0}
               initialCompleted={c?.completed ?? false}
-            //   onUpdate={onCountUpdate}
+              onUpdate={onCountUpdate}
             />
           ) : (
             <SimpleItem

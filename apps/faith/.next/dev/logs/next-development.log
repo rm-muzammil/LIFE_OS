@@ -1,0 +1,5 @@
+{"timestamp":"00:00:04.803","source":"Server","level":"LOG","message":"> [PWA] PWA support is disabled"}
+{"timestamp":"00:00:04.804","source":"Server","level":"LOG","message":"> [PWA] PWA support is disabled"}
+{"timestamp":"00:00:05.490","source":"Server","level":"WARN","message":"⚠ The \"middleware\" file convention is deprecated. Please use \"proxy\" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy"}
+{"timestamp":"00:00:11.261","source":"Server","level":"LOG","message":"[db] Neon connection warmed"}
+{"timestamp":"00:00:11.273","source":"Server","level":"LOG","message":""}
