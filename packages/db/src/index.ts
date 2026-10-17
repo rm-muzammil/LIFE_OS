@@ -7,9 +7,10 @@ export * from './schema';
 neonConfig.fetchFunction = (url: string, init: RequestInit) =>
   fetch(url, { ...init, cache: 'no-store' });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set. Add it to your .env.local file.');
-}
+// Provide a fallback connection string for build-time static evaluation
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://placeholder:placeholder@localhost:5432/placeholder';
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(connectionString);
 export const db = drizzle(sql, { schema });
