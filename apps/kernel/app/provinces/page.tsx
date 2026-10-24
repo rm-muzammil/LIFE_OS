@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCcw, X } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
@@ -99,9 +100,15 @@ export default function ProvincesPage() {
                   <td className="py-3 px-4 text-zinc-500">{p.slug}</td>
                   <td className="py-3 px-4 text-zinc-500 max-w-[160px] truncate">
                     {p.url ? (
-                      <a href={p.url} target="_blank" className="hover:text-brand-400">
-                        {p.url.replace(/^https?:\/\//, '')}
-                      </a>
+                      p.url.startsWith('/') ? (
+                        <Link href={p.url} className="hover:text-brand-400">
+                          {p.url}
+                        </Link>
+                      ) : (
+                        <a href={p.url} target="_blank" rel="noreferrer" className="hover:text-brand-400">
+                          {p.url.replace(/^https?:\/\//, '')}
+                        </a>
+                      )
                     ) : (
                       '—'
                     )}

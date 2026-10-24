@@ -1,16 +1,28 @@
 'use client';
 
+import Link from 'next/link';
 import { Flame, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
 
 export default function ProvinceCard({ province }: { province: ProvinceWithMeta }) {
-const neverPushed = province.cachedScore == null;
+  const neverPushed = province.cachedScore == null;
+  const name = province.url.startsWith('/') ? (
+    <Link href={province.url} className="hover:text-brand-300">
+      {province.name}
+    </Link>
+  ) : province.url ? (
+    <a href={province.url} target="_blank" rel="noreferrer" className="hover:text-brand-300">
+      {province.name}
+    </a>
+  ) : (
+    province.name
+  );
 
   return (
     <div className="card card-hover p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-zinc-100">{province.name}</h3>
+          <h3 className="font-semibold text-zinc-100">{name}</h3>
           <p className="text-xs text-zinc-600">weight {(province.weight * 100).toFixed(0)}%</p>
         </div>
         {province.stale && !neverPushed && (

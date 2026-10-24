@@ -24,3 +24,16 @@ export async function PATCH(
     .returning();
   return NextResponse.json(row);
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const userId = await getApiUserId();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  await db
+    .delete(wealthZakatAssets)
+    .where(and(eq(wealthZakatAssets.userId, userId), eq(wealthZakatAssets.id, params.id)));
+  return NextResponse.json({ ok: true });
+}
