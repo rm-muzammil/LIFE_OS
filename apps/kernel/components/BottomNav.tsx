@@ -9,6 +9,7 @@ import {
   Heart,
   NotebookPen,
   Building2,
+  Wallet,
   CalendarDays,
   MessageCircle,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: '/life-score', label: 'Score', icon: TrendingUp },
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Review', icon: NotebookPen },
+  { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/provinces', label: 'Provinces', icon: Building2 },
 ];
 
@@ -32,7 +34,7 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-zinc-950/95 backdrop-blur border-t border-zinc-900 pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center h-16 overflow-x-auto">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href === '/wealth' && pathname.startsWith('/wealth/'));
           return (
             <Link
               key={href}

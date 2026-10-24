@@ -10,6 +10,8 @@ import {
   smallint,
   date,
   unique,
+  index,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 // 1. provinces — registry + cache
@@ -173,6 +175,99 @@ export const userSettings = pgTable('user_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const wealthTransactions = pgTable(
+  'wealth_transactions',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    type: text('type').notNull(),
+    amount: real('amount').notNull(),
+    category: text('category').notNull(),
+    subTag: text('sub_tag').notNull(),
+    halalVerified: boolean('halal_verified').notNull().default(false),
+    recurring: boolean('recurring').notNull().default(false),
+    linkedGoalId: text('linked_goal_id'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userIdIdx: index('wealth_transactions_user_id_idx').on(table.userId),
+    userDateIdx: index('wealth_transactions_user_date_idx').on(table.userId, table.date),
+  })
+);
+
+export const wealthZakatAssets = pgTable(
+  'wealth_zakat_assets',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    assetName: text('asset_name').notNull(),
+    currentValue: real('current_value').notNull(),
+    zakatEligible: boolean('zakat_eligible').notNull().default(true),
+    nisabThreshold: real('nisab_threshold').notNull().default(0),
+    hawlStartDate: text('hawl_start_date').notNull(),
+    paid: boolean('paid').notNull().default(false),
+    paidDate: text('paid_date'),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userIdIdx: index('wealth_zakat_assets_user_id_idx').on(table.userId),
+  })
+);
+
+export const wealthGoals = pgTable(
+  'wealth_goals',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    targetAmount: real('target_amount').notNull(),
+    deadline: text('deadline').notNull(),
+    priority: text('priority').notNull(),
+    status: text('status').notNull().default('Active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userIdIdx: index('wealth_goals_user_id_idx').on(table.userId),
+    userCreatedAtIdx: index('wealth_goals_user_created_at_idx').on(table.userId, table.createdAt),
+  })
+);
+
+export const wealthDebts = pgTable(
+  'wealth_debts',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    lender: text('lender').notNull(),
+    totalAmount: real('total_amount').notNull(),
+    payoffDeadline: text('payoff_deadline'),
+    monthlyCommitment: real('monthly_commitment').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userIdIdx: index('wealth_debts_user_id_idx').on(table.userId),
+    userCreatedAtIdx: index('wealth_debts_user_created_at_idx').on(table.userId, table.createdAt),
+  })
+);
+
+export const wealthSettings = pgTable(
+  'wealth_settings',
+  {
+    userId: text('user_id').notNull(),
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.key] }),
+    userIdIdx: index('wealth_settings_user_id_idx').on(table.userId),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -191,3 +286,13 @@ export type PrayerTimesRow = typeof prayerTimes.$inferSelect;
 export type NewPrayerTimesRow = typeof prayerTimes.$inferInsert;
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 export type NewUserSettingsRow = typeof userSettings.$inferInsert;
+export type WealthTransaction = typeof wealthTransactions.$inferSelect;
+export type NewWealthTransaction = typeof wealthTransactions.$inferInsert;
+export type WealthZakatAsset = typeof wealthZakatAssets.$inferSelect;
+export type NewWealthZakatAsset = typeof wealthZakatAssets.$inferInsert;
+export type WealthGoal = typeof wealthGoals.$inferSelect;
+export type NewWealthGoal = typeof wealthGoals.$inferInsert;
+export type WealthDebt = typeof wealthDebts.$inferSelect;
+export type NewWealthDebt = typeof wealthDebts.$inferInsert;
+export type WealthSetting = typeof wealthSettings.$inferSelect;
+export type NewWealthSetting = typeof wealthSettings.$inferInsert;

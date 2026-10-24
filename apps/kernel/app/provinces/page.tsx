@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCcw, X } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
@@ -87,21 +88,29 @@ export default function ProvincesPage() {
                 <th className="py-3 px-4">URL</th>
                 <th className="py-3 px-4">Weight</th>
                 <th className="py-3 px-4">Active</th>
-                <th className="py-3 px-4">Last Push</th>
+                <th className="py-3 px-4">Last Update</th>
                 <th className="py-3 px-4">Score</th>
                 <th className="py-3 px-4"></th>
               </tr>
             </thead>
             <tbody>
-              {provinces.map((p) => (
+              {provinces.map((p) => {
+                const lastUpdate = p.slug === 'wealth' ? p.lastPulledAt : p.lastPushedAt;
+                return (
                 <tr key={p.slug} className="border-b border-zinc-900">
                   <td className="py-3 px-4 font-medium">{p.name}</td>
                   <td className="py-3 px-4 text-zinc-500">{p.slug}</td>
                   <td className="py-3 px-4 text-zinc-500 max-w-[160px] truncate">
                     {p.url ? (
-                      <a href={p.url} target="_blank" className="hover:text-brand-400">
-                        {p.url.replace(/^https?:\/\//, '')}
-                      </a>
+                      p.url.startsWith('/') ? (
+                        <Link href={p.url} className="hover:text-brand-400">
+                          {p.url}
+                        </Link>
+                      ) : (
+                        <a href={p.url} target="_blank" rel="noreferrer" className="hover:text-brand-400">
+                          {p.url.replace(/^https?:\/\//, '')}
+                        </a>
+                      )
                     ) : (
                       '—'
                     )}
@@ -132,8 +141,8 @@ export default function ProvincesPage() {
                     </button>
                   </td>
                   <td className="py-3 px-4 text-zinc-500 text-xs">
-                    {p.lastPushedAt
-                      ? new Date(p.lastPushedAt).toLocaleString('en-US', {
+                    {lastUpdate
+                      ? new Date(lastUpdate).toLocaleString('en-US', {
                           timeZone: 'Asia/Karachi',
                           month: 'short',
                           day: 'numeric',
@@ -162,7 +171,8 @@ export default function ProvincesPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -15,6 +15,13 @@
       "when": 1788885316714,
       "tag": "0001_hesitant_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792828676371,
+      "tag": "0002_brief_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }

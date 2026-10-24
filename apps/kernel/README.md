@@ -1,7 +1,7 @@
 # Self-Khilafah v2
 
-Life governance kernel. Receives daily reports from your 6 province apps, computes a
-weighted life score, and tracks character, weekly review, and hadith study.
+Life governance kernel. Combines internal and external province scores into a weighted
+life score, and tracks character, weekly review, and hadith study.
 
 ## Stack
 
@@ -54,15 +54,15 @@ callback in `lib/auth-options.ts`). No manual registration step, no per-user API
 |---------------|-----------------|-------------------------------------------------|--------|
 | Faith         | faith           | https://faithtracker.vercel.app                 | 0.25   |
 | Personal      | personal        | https://personal-blush-zeta.vercel.app          | 0.20   |
-| Wealth        | wealth          | https://wealth-app-eta.vercel.app               | 0.15   |
+| Wealth        | wealth          | /wealth                                          | 0.15   |
 | Roadmap       | roadmap         | https://life-os-chi-ecru.vercel.app             | 0.15   |
 | Relationships | relationships   | https://your-relationships-app.vercel.app       | 0.10   |
 | Work          | work            | https://work-app-azure.vercel.app               | 0.10   |
 
-Update the URLs in `lib/default-provinces.ts` to match your actual deployed province
-apps before anyone signs in — those are baked in at provisioning time, though you can
-always edit a province's URL later directly in the database (there's no UI for it
-currently, since the `/provinces` page treats the URL as read-only).
+Wealth is an internal module at `/wealth` and is scored directly from the user's Wealth
+tables. Faith, Roadmap, and other external provinces continue using the push/pull API.
+Update external URLs in `lib/default-provinces.ts` to match your actual deployed
+province apps before anyone signs in — those are baked in at provisioning time.
 
 **Push (province → SK):** every province app now shares **one** API key —
 `PROVINCE_SHARED_API_KEY` — instead of a unique key per user. A province app
@@ -120,6 +120,43 @@ per-user `X-Api-Key`. Those stop working the moment this update ships — update
 province app's env var to the new single `PROVINCE_SHARED_API_KEY`, and add your Google
 `sub` as a `userId` field in whatever request body it sends to `/api/provinces/report`.
 
+## Wealth module migration
+
+The Wealth module uses per-user `wealth_*` tables and `getApiUserId()`-scoped API routes.
+The schema source is `packages/db/src/schema.ts`; generate migrations with Drizzle and
+apply the generated migration (do not use `db:push` for this change):
+
+```bash
+cd apps/kernel
+NODE_PATH=../../node_modules/.pnpm/drizzle-kit@0.24.2/node_modules \
+  node --preserve-symlinks-main node_modules/drizzle-kit/bin.cjs migrate --config drizzle.config.ts
+```
+
+The direct invocation keeps Drizzle Kit's dependencies resolvable from its pnpm virtual
+store while letting its compatibility check resolve Kernel's Drizzle ORM version.
+
+Existing users' province URLs can be changed safely with the dry-run-first script:
+
+```bash
+cd apps/kernel
+pnpm dlx tsx --tsconfig tsconfig.json scripts/internalize-province.ts wealth
+pnpm dlx tsx --tsconfig tsconfig.json scripts/internalize-province.ts wealth --apply
+```
+
+To copy the standalone Wealth database, set `WEALTH_DATABASE_URL` to its connection
+string and `DATABASE_URL` to Kernel's connection string. The importer never deletes
+source or target rows and is idempotent. Dry-run first; because the legacy tables have
+no `user_id`, pass the account's Google `sub` when applying:
+
+```bash
+cd apps/kernel
+pnpm dlx tsx --tsconfig tsconfig.json scripts/migrate-wealth-data.ts --dry-run
+pnpm dlx tsx --tsconfig tsconfig.json scripts/migrate-wealth-data.ts --apply --user-id <google-sub>
+```
+
+If every legacy table already has `user_id` (or `userId`), the importer preserves those
+values and ignores `--user-id`.
+
 ## Deploying to Vercel
 
 1. Push this repo to GitHub.
@@ -168,6 +205,8 @@ app/                  — pages + API routes (App Router)
   auth/signin/         — Google sign-in page
   api/auth/            — next-auth route ([...nextauth])
   api/provinces/       — report (push), register, [slug] (patch/delete), list
+  api/wealth/          — per-user transactions, zakat, goals, debt, settings, score
+  wealth/              — Wealth dashboard and management pages
   api/life-score/      — current score + 12-week history
   api/character/       — weekly virtue ratings
   api/review/          — weekly review
@@ -178,7 +217,7 @@ components/           — Sidebar, BottomNav, SessionProvider, ScoreRing, Provin
 db/                    — Drizzle schema + connection
 lib/                   — time (PKT), auth (bcrypt + session helpers), gemini, life-score, shared types
 middleware.ts          — redirects signed-out visitors to /auth/signin
-scripts/               — seed-provinces.ts
+scripts/               — seed-provinces.ts, internalize-province.ts, migrate-wealth-data.ts
 ```
 
 ## Multi-user notes
