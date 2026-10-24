@@ -128,8 +128,12 @@ apply the generated migration (do not use `db:push` for this change):
 
 ```bash
 cd apps/kernel
-pnpm exec drizzle-kit migrate --config drizzle.config.ts
+NODE_PATH=../../node_modules/.pnpm/drizzle-kit@0.24.2/node_modules \
+  node --preserve-symlinks-main node_modules/drizzle-kit/bin.cjs migrate --config drizzle.config.ts
 ```
+
+The direct invocation keeps Drizzle Kit's dependencies resolvable from its pnpm virtual
+store while letting its compatibility check resolve Kernel's Drizzle ORM version.
 
 Existing users' province URLs can be changed safely with the dry-run-first script:
 
