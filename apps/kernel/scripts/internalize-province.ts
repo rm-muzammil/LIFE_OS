@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { db } from '@/db';
 import { provinces } from '@/db/schema';
 import { eq } from 'drizzle-orm';
