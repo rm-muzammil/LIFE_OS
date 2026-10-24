@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { personalDailyLogs, personalWorkoutPlans } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
-import { getPersonalGeminiKeys } from '@/lib/personal/api';
+import {
+  getPersonalGeminiKeys,
+  refreshPersonalProvinceScore,
+} from '@/lib/personal/api';
 import {
   generateWeeklyWorkouts,
   getMondayOfWeek,
@@ -54,6 +57,7 @@ export async function POST() {
           set: { weekStart: monday, day: plan.day, plan: { exercises: plan.exercises, focus: plan.focus } },
         });
     }
+    await refreshPersonalProvinceScore(userId);
     return NextResponse.json({ ok: true, plans });
   } catch (error) {
     console.error('Personal Gemini generation failed:', error);

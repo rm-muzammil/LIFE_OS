@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { userSettings } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
+import { refreshPersonalProvinceScore } from '@/lib/personal/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,5 +42,6 @@ export async function POST(req: NextRequest) {
       set: { geminiKey1: body.geminiApiKey.trim(), updatedAt: new Date() },
     });
 
+  await refreshPersonalProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }

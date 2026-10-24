@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { personalExerciseLogs, personalWorkoutPlans } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
+import { refreshPersonalProvinceScore } from '@/lib/personal/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,5 +50,6 @@ export async function POST(req: NextRequest) {
       set: { weekStart, day, plan },
     });
 
+  await refreshPersonalProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }

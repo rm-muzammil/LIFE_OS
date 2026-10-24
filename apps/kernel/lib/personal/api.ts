@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { userSettings } from '@/db/schema';
+import { refreshInternalProvince } from '@/lib/internal-provinces';
 
 export async function getPersonalGeminiKeys(userId: string): Promise<string[]> {
   const [settings] = await db
@@ -14,4 +15,12 @@ export async function getPersonalGeminiKeys(userId: string): Promise<string[]> {
   return [settings?.geminiKey1, settings?.geminiKey2, settings?.geminiKey3].filter(
     (key): key is string => Boolean(key)
   );
+}
+
+export async function refreshPersonalProvinceScore(userId: string): Promise<void> {
+  try {
+    await refreshInternalProvince(userId, 'personal');
+  } catch (error) {
+    console.error('Personal province score refresh failed:', error);
+  }
 }

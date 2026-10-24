@@ -13,7 +13,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Personal',
     slug: 'personal',
-    url: 'https://personal-blush-zeta.vercel.app',
+    url: '/personal',
     weight: 0.2,
   },
   {

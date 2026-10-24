@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { personalDailyLogs, type NewPersonalDailyLog } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
+import { refreshPersonalProvinceScore } from '@/lib/personal/api';
 import { computeScore, isRestDay } from '@/lib/personal/scoring';
 
 export const dynamic = 'force-dynamic';
@@ -117,5 +118,6 @@ export async function POST(req: NextRequest) {
       });
   }
 
+  await refreshPersonalProvinceScore(userId);
   return NextResponse.json({ ok: true, score });
 }
