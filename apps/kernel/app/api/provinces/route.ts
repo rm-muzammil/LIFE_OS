@@ -21,6 +21,7 @@ export async function GET() {
 
     const result: ProvinceWithMeta[] = rows.map((p) => {
       const details = (p.cachedDetails ?? {}) as Record<string, unknown>;
+      const latestCacheAt = p.slug === 'wealth' ? p.lastPulledAt : p.lastPushedAt;
       return {
         id: p.id,
         name: p.name,
@@ -36,7 +37,7 @@ export async function GET() {
         createdAt: p.createdAt.toISOString(),
         streak: typeof details.streak === 'number' ? details.streak : 0,
         todayDone: typeof details.todayDone === 'boolean' ? details.todayDone : false,
-        stale: isStale(p.lastPushedAt),
+        stale: isStale(latestCacheAt),
       };
     });
 

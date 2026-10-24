@@ -88,13 +88,15 @@ export default function ProvincesPage() {
                 <th className="py-3 px-4">URL</th>
                 <th className="py-3 px-4">Weight</th>
                 <th className="py-3 px-4">Active</th>
-                <th className="py-3 px-4">Last Push</th>
+                <th className="py-3 px-4">Last Update</th>
                 <th className="py-3 px-4">Score</th>
                 <th className="py-3 px-4"></th>
               </tr>
             </thead>
             <tbody>
-              {provinces.map((p) => (
+              {provinces.map((p) => {
+                const lastUpdate = p.slug === 'wealth' ? p.lastPulledAt : p.lastPushedAt;
+                return (
                 <tr key={p.slug} className="border-b border-zinc-900">
                   <td className="py-3 px-4 font-medium">{p.name}</td>
                   <td className="py-3 px-4 text-zinc-500">{p.slug}</td>
@@ -139,8 +141,8 @@ export default function ProvincesPage() {
                     </button>
                   </td>
                   <td className="py-3 px-4 text-zinc-500 text-xs">
-                    {p.lastPushedAt
-                      ? new Date(p.lastPushedAt).toLocaleString('en-US', {
+                    {lastUpdate
+                      ? new Date(lastUpdate).toLocaleString('en-US', {
                           timeZone: 'Asia/Karachi',
                           month: 'short',
                           day: 'numeric',
@@ -169,7 +171,8 @@ export default function ProvincesPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

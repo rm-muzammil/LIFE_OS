@@ -6,6 +6,8 @@ import type { ProvinceWithMeta } from '@/lib/types';
 
 export default function ProvinceCard({ province }: { province: ProvinceWithMeta }) {
   const neverPushed = province.cachedScore == null;
+  const lastUpdate =
+    province.slug === 'wealth' ? province.lastPulledAt : province.lastPushedAt;
   const name = province.url.startsWith('/') ? (
     <Link href={province.url} className="hover:text-brand-300">
       {province.name}
@@ -33,7 +35,7 @@ export default function ProvinceCard({ province }: { province: ProvinceWithMeta 
       </div>
 
       {neverPushed ? (
-        <p className="text-sm text-zinc-600 italic py-2">Awaiting first push</p>
+        <p className="text-sm text-zinc-600 italic py-2">Awaiting first score</p>
       ) : (
         <>
           <div className="flex items-end gap-1">
@@ -56,9 +58,10 @@ export default function ProvinceCard({ province }: { province: ProvinceWithMeta 
               {province.todayDone ? 'done today' : 'not yet'}
             </span>
           </div>
-          {province.lastPushedAt && (
+          {lastUpdate && (
             <p className="text-[11px] text-zinc-700">
-              last push {new Date(province.lastPushedAt).toLocaleString('en-US', {
+              {province.slug === 'wealth' ? 'last update ' : 'last push '}
+              {new Date(lastUpdate).toLocaleString('en-US', {
                 timeZone: 'Asia/Karachi',
                 month: 'short',
                 day: 'numeric',
