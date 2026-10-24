@@ -19,7 +19,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Wealth',
     slug: 'wealth',
-    url: 'https://wealth-app-eta.vercel.app',
+    url: '/wealth',
     weight: 0.15,
   },
   {

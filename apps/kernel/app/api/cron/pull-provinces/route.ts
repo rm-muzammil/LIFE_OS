@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { provinces, provinceDailySnapshots } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { todayPKT } from '@/lib/time';
 import type { ProvinceReportPayload } from '@/lib/types';
+import { INTERNAL_PROVINCES } from '@/lib/internal-provinces';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,21 +21,29 @@ export async function GET(req: NextRequest) {
 
   const results = await Promise.allSettled(
     active.map(async (p) => {
-      if (!p.url) throw new Error(`${p.slug} has no url configured`);
+      const computeInternalScore = INTERNAL_PROVINCES[p.slug];
+      let payload: Omit<ProvinceReportPayload, 'userId'>;
 
-      const res = await fetch(`${p.url.replace(/\/$/, '')}/api/report`, {
-        headers: {
-          Authorization: `Bearer ${p.pullSecret}`,
-          'X-User-Id': p.userId,
-        },
-        cache: 'no-store',
-      });
+      if (computeInternalScore) {
+        payload = await computeInternalScore(p.userId);
+      } else {
+        if (!p.url) throw new Error(`${p.slug} has no url configured`);
 
-      if (!res.ok) {
-        throw new Error(`${p.slug} responded ${res.status}`);
+        const res = await fetch(`${p.url.replace(/\/$/, '')}/api/report`, {
+          headers: {
+            Authorization: `Bearer ${p.pullSecret}`,
+            'X-User-Id': p.userId,
+          },
+          cache: 'no-store',
+        });
+
+        if (!res.ok) {
+          throw new Error(`${p.slug} responded ${res.status}`);
+        }
+
+        payload = (await res.json()) as ProvinceReportPayload;
       }
 
-      const payload = (await res.json()) as ProvinceReportPayload;
       const now = new Date();
       const details = {
         ...(payload.details ?? {}),
@@ -50,7 +59,7 @@ export async function GET(req: NextRequest) {
           cachedAt: now,
           lastPulledAt: now,
         })
-        .where(eq(provinces.id, p.id));
+        .where(and(eq(provinces.id, p.id), eq(provinces.userId, p.userId)));
 
       await db
         .insert(provinceDailySnapshots)
