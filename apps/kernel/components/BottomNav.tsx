@@ -11,6 +11,7 @@ import {
   Building2,
   Dumbbell,
   Wallet,
+  UsersRound,
   CalendarDays,
   MessageCircle,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: '/review', label: 'Review', icon: NotebookPen },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
+  { href: '/relationships', label: 'Relationships', icon: UsersRound },
   { href: '/provinces', label: 'Provinces', icon: Building2 },
 ];
 
@@ -39,7 +41,8 @@ export default function BottomNav() {
           const active =
             pathname === href ||
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
-            (href === '/personal' && pathname.startsWith('/personal/'));
+            (href === '/personal' && pathname.startsWith('/personal/')) ||
+            (href === '/relationships' && pathname.startsWith('/relationships/'));
           return (
             <Link
               key={href}

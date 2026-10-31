@@ -13,6 +13,7 @@ import {
   Building2,
   Dumbbell,
   Wallet,
+  UsersRound,
   Settings,
   CalendarDays,
   MessageCircle,
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { href: '/hadith', label: 'Hadith', icon: BookOpen },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
+  { href: '/relationships', label: 'Relationships', icon: UsersRound },
   { href: '/provinces', label: 'Provinces', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -89,7 +91,8 @@ export default function Sidebar() {
           const active =
             pathname === href ||
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
-            (href === '/personal' && pathname.startsWith('/personal/'));
+            (href === '/personal' && pathname.startsWith('/personal/')) ||
+            (href === '/relationships' && pathname.startsWith('/relationships/'));
           return (
             <Link
               key={href}
