@@ -1,5 +1,6 @@
 import { computeWealthScore } from '@/lib/wealth/score';
 import { computePersonalScore } from '@/lib/personal/score';
+import { computeRelationshipsScore } from '@/lib/relationships/score';
 import { db } from '@/db';
 import { provinces, provinceDailySnapshots } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -13,6 +14,7 @@ type InternalProvinceScorer = (
 export const INTERNAL_PROVINCES: Partial<Record<string, InternalProvinceScorer>> = {
   wealth: computeWealthScore,
   personal: computePersonalScore,
+  relationships: computeRelationshipsScore,
 };
 
 export async function refreshInternalProvince(userId: string, slug: string): Promise<void> {

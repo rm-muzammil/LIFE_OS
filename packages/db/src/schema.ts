@@ -337,6 +337,44 @@ export const personalExerciseLogs = pgTable(
   })
 );
 
+export const relationshipsDailyLogs = pgTable(
+  'relationships_daily_logs',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    contactedParents: boolean('contacted_parents').notNull().default(false),
+    familyTies: boolean('family_ties').notNull().default(false),
+    helpedSomeone: boolean('helped_someone').notNull().default(false),
+    goodDeed: boolean('good_deed').notNull().default(false),
+    communityObligation: boolean('community_obligation').notNull().default(false),
+    charityAmount: integer('charity_amount').notNull().default(0),
+    goodDeedsCount: integer('good_deeds_count').notNull().default(0),
+    notes: text('notes').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userDateUnique: unique().on(table.userId, table.date),
+    userDateIdx: index('relationships_daily_logs_user_date_idx').on(table.userId, table.date),
+  })
+);
+
+export const relationshipsSettings = pgTable(
+  'relationships_settings',
+  {
+    userId: text('user_id').notNull(),
+    key: text('key').notNull(),
+    value: text('value').notNull().default(''),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.key] }),
+    userIdIdx: index('relationships_settings_user_id_idx').on(table.userId),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -371,3 +409,7 @@ export type PersonalWorkoutPlan = typeof personalWorkoutPlans.$inferSelect;
 export type NewPersonalWorkoutPlan = typeof personalWorkoutPlans.$inferInsert;
 export type PersonalExerciseLog = typeof personalExerciseLogs.$inferSelect;
 export type NewPersonalExerciseLog = typeof personalExerciseLogs.$inferInsert;
+export type RelationshipsDailyLog = typeof relationshipsDailyLogs.$inferSelect;
+export type NewRelationshipsDailyLog = typeof relationshipsDailyLogs.$inferInsert;
+export type RelationshipsSetting = typeof relationshipsSettings.$inferSelect;
+export type NewRelationshipsSetting = typeof relationshipsSettings.$inferInsert;
