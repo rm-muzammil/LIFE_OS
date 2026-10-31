@@ -37,7 +37,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Work',
     slug: 'work',
-    url: 'https://work-app-azure.vercel.app',
+    url: '/work',
     weight: 0.1,
   },
 ] as const;

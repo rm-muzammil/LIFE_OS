@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
+import { refreshWorkProvinceScore } from '@/lib/work/api';
 import {
   createProject,
   isDateString,
@@ -42,5 +43,6 @@ export async function POST(req: NextRequest) {
     status: isProjectStatus(body.status) ? body.status : 'active',
     targetDate: isDateString(body.targetDate) ? body.targetDate : null,
   });
+  await refreshWorkProvinceScore(userId);
   return NextResponse.json({ project }, { status: 201 });
 }

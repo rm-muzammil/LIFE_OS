@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
 import { computeWorkScore } from '@/lib/work/report';
+import { refreshWorkProvinceScore } from '@/lib/work/api';
 import {
   getLogByDate,
   getRecentLogs,
@@ -82,5 +83,6 @@ export async function POST(req: NextRequest) {
     notes: typeof body.notes === 'string' ? body.notes : null,
   });
   const report = await computeWorkScore(userId);
+  await refreshWorkProvinceScore(userId);
   return NextResponse.json({ log, report });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
+import { refreshWorkProvinceScore } from '@/lib/work/api';
 import {
   deleteProject,
   isDateString,
@@ -47,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
   const project = await updateProject(userId, params.id, input);
   if (!project) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  await refreshWorkProvinceScore(userId);
   return NextResponse.json({ project });
 }
 
@@ -57,5 +59,6 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
 
   const deleted = await deleteProject(userId, params.id);
   if (!deleted) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  await refreshWorkProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }
