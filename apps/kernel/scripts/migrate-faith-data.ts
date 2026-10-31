@@ -42,6 +42,9 @@ interface Options {
 interface TableScan {
   count: number;
   duplicateCount: number;
+  hasDateColumn: boolean;
+  minDate: string | null;
+  maxDate: string | null;
 }
 
 function parseOptions(args: string[]): Options {
@@ -83,10 +86,20 @@ function requiredString(value: unknown, name: string): string {
 }
 
 function requiredDate(value: unknown): string {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+  const match = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
+  if (!match) {
+    throw new Error('Legacy data has an invalid date value.');
   }
-  return requiredString(value, 'date');
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) {
+    throw new Error('Legacy data has an invalid date value.');
+  }
+  return match[0];
 }
 
 function optionalInteger(value: unknown, fallback = 0): number {
@@ -119,15 +132,27 @@ function optionalText(value: unknown): string | null {
 
 function optionalDateTime(value: unknown): Date | undefined {
   if (value == null) return undefined;
-  const date = value instanceof Date ? value : new Date(requiredString(value, 'timestamp'));
-  if (Number.isNaN(date.getTime())) throw new Error('Legacy data has an invalid timestamp value.');
+  if (typeof value !== 'string') throw new Error('Legacy data has an invalid timestamp value.');
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})Z$/.exec(value);
+  if (!match) throw new Error('Legacy timestamp must be text formatted in UTC.');
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, millisecondText] = match;
+  const date = new Date(Date.UTC(
+    Number(yearText),
+    Number(monthText) - 1,
+    Number(dayText),
+    Number(hourText),
+    Number(minuteText),
+    Number(secondText),
+    Number(millisecondText)
+  ));
+  if (date.toISOString() !== value) throw new Error('Legacy data has an invalid timestamp value.');
   return date;
 }
 
-function findUserIdColumn(columns: Set<string>, tableName: string): UserIdColumn {
+function findUserIdColumn(columns: Map<string, string>, tableName: string): UserIdColumn {
   if (columns.has('user_id')) return 'user_id';
   if (columns.has('userId')) return 'userId';
-  if ([...columns].some((column) => column.toLowerCase() === 'userid')) {
+  if ([...columns.keys()].some((column) => column.toLowerCase() === 'userid')) {
     throw new Error(`${tableName} has an unsupported userId column name.`);
   }
   return null;
@@ -296,32 +321,57 @@ function settingKind(key: string): 'faith' | 'gemini' | 'excluded' | 'unknown' {
   return 'unknown';
 }
 
-async function readColumns(sourceSql: SourceSql): Promise<Map<LegacyTableName, Set<string>>> {
+type LegacyColumns = Map<LegacyTableName, Map<string, string>>;
+
+async function readColumns(sourceSql: SourceSql): Promise<LegacyColumns> {
   const placeholders = TABLE_NAMES.map((_, index) => `$${index + 1}`).join(', ');
   const rows = await sourceSql(
-    `SELECT table_name, column_name
+    `SELECT table_name, column_name, data_type
        FROM information_schema.columns
       WHERE table_schema = current_schema()
         AND table_name IN (${placeholders})`,
     [...TABLE_NAMES]
   );
-  const columns = new Map(TABLE_NAMES.map((tableName) => [tableName, new Set<string>()]));
+  const columns = new Map(TABLE_NAMES.map((tableName) => [tableName, new Map<string, string>()]));
   for (const row of rows) {
     const tableName = requiredString(row.table_name, 'table_name') as LegacyTableName;
-    columns.get(tableName)?.add(requiredString(row.column_name, 'column_name'));
+    columns.get(tableName)?.set(
+      requiredString(row.column_name, 'column_name'),
+      requiredString(row.data_type, 'data_type')
+    );
   }
   return columns;
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+function selectColumns(columns: Map<string, string>): string {
+  return [...columns].map(([column, dataType]) => {
+    const quoted = quoteIdentifier(column);
+    if (dataType === 'date') return `${quoted}::text AS ${quoted}`;
+    if (dataType === 'timestamp without time zone') {
+      return `to_char(${quoted} AT TIME ZONE 'UTC' AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS') || 'Z' AS ${quoted}`;
+    }
+    if (dataType === 'timestamp with time zone') {
+      return `to_char(${quoted} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS') || 'Z' AS ${quoted}`;
+    }
+    return quoted;
+  }).join(', ');
 }
 
 async function fetchBatch(
   sourceSql: SourceSql,
   tableName: LegacyTableName,
-  lastId: number | null
+  lastId: number | null,
+  columns: LegacyColumns
 ): Promise<LegacyRow[]> {
+  const select = selectColumns(columns.get(tableName)!);
   const rows = lastId === null
-    ? await sourceSql(`SELECT * FROM "${tableName}" ORDER BY "id" LIMIT $1`, [BATCH_SIZE])
+    ? await sourceSql(`SELECT ${select} FROM "${tableName}" ORDER BY "id" LIMIT $1`, [BATCH_SIZE])
     : await sourceSql(
-        `SELECT * FROM "${tableName}" WHERE "id" > $1 ORDER BY "id" LIMIT $2`,
+        `SELECT ${select} FROM "${tableName}" WHERE "id" > $1 ORDER BY "id" LIMIT $2`,
         [lastId, BATCH_SIZE]
       );
   return rows as LegacyRow[];
@@ -356,15 +406,18 @@ async function scanTable(
   sourceSql: SourceSql,
   tableName: LegacyTableName,
   userIdColumn: UserIdColumn,
-  fallbackUserId: string | null
+  fallbackUserId: string | null,
+  columns: LegacyColumns
 ): Promise<TableScan> {
   const seen = new Set<string>();
   let count = 0;
   let duplicateCount = 0;
+  let minDate: string | null = null;
+  let maxDate: string | null = null;
   let lastId: number | null = null;
 
   for (;;) {
-    const rows = await fetchBatch(sourceSql, tableName, lastId);
+    const rows = await fetchBatch(sourceSql, tableName, lastId, columns);
     if (rows.length === 0) break;
     for (const row of rows) {
       const id = optionalInteger(row.id, Number.NaN);
@@ -372,11 +425,22 @@ async function scanTable(
       const key = naturalKey(tableName, row, userIdColumn, fallbackUserId);
       if (seen.has(key)) duplicateCount += 1;
       else seen.add(key);
+      if (columns.get(tableName)?.get('date') === 'date') {
+        const rowDate = requiredDate(row.date);
+        if (minDate === null || rowDate < minDate) minDate = rowDate;
+        if (maxDate === null || rowDate > maxDate) maxDate = rowDate;
+      }
       count += 1;
       lastId = id;
     }
   }
-  return { count, duplicateCount };
+  return {
+    count,
+    duplicateCount,
+    hasDateColumn: columns.get(tableName)?.get('date') === 'date',
+    minDate,
+    maxDate,
+  };
 }
 
 async function copyBatches<T>(
@@ -384,6 +448,7 @@ async function copyBatches<T>(
   tableName: LegacyTableName,
   userIdColumn: UserIdColumn,
   fallbackUserId: string | null,
+  columns: LegacyColumns,
   mapRow: (row: LegacyRow, column: UserIdColumn, fallback: string | null) => T,
   insertRows: (rows: T[]) => Promise<number>
 ): Promise<{ scanned: number; inserted: number }> {
@@ -391,7 +456,7 @@ async function copyBatches<T>(
   let inserted = 0;
   let lastId: number | null = null;
   for (;;) {
-    const rows = await fetchBatch(sourceSql, tableName, lastId);
+    const rows = await fetchBatch(sourceSql, tableName, lastId, columns);
     if (rows.length === 0) break;
     const mapped = rows.map((row) => mapRow(row, userIdColumn, fallbackUserId));
     inserted += await insertRows(mapped);
@@ -405,7 +470,8 @@ async function copyBatches<T>(
 async function copySettings(
   sourceSql: SourceSql,
   userIdColumn: UserIdColumn,
-  fallbackUserId: string | null
+  fallbackUserId: string | null,
+  columns: LegacyColumns
 ): Promise<{ scanned: number; faithInserted: number; geminiTransferred: number; skipped: number }> {
   let scanned = 0;
   let faithInserted = 0;
@@ -414,7 +480,7 @@ async function copySettings(
   let lastId: number | null = null;
 
   for (;;) {
-    const rows = await fetchBatch(sourceSql, 'settings', lastId);
+    const rows = await fetchBatch(sourceSql, 'settings', lastId, columns);
     if (rows.length === 0) break;
     for (const row of rows) {
       scanned += 1;
@@ -507,19 +573,25 @@ async function main() {
         sourceSql,
         tableName,
         userIdColumns.get(tableName)!,
-        options.userId
+        options.userId,
+        columns
       )
     );
   }
   for (const [tableName, result] of scans) {
     console.log(`${tableName}: ${result.count} source row(s); ${result.duplicateCount} duplicate natural key(s).`);
+    if (!options.apply) {
+      const minDate = result.hasDateColumn ? result.minDate ?? 'none' : 'N/A (no date column)';
+      const maxDate = result.hasDateColumn ? result.maxDate ?? 'none' : 'N/A (no date column)';
+      console.log(`  min date: ${minDate}; max date: ${maxDate}`);
+    }
   }
   if ([...scans.values()].some((result) => result.duplicateCount > 0)) {
     throw new Error('Duplicate natural keys found; no data was migrated.');
   }
 
   const unknownSettingNames = new Set<string>();
-  const settingRows = await fetchAllSettingNames(sourceSql);
+  const settingRows = await fetchAllSettingNames(sourceSql, columns);
   for (const key of settingRows) {
     if (settingKind(key) === 'unknown') unknownSettingNames.add(key);
   }
@@ -541,6 +613,7 @@ async function main() {
     'daily_log',
     userIdColumns.get('daily_log')!,
     options.userId,
+    columns,
     mapDailyLog,
     async (rows) => (await db
       .insert(faithDailyLogs)
@@ -555,6 +628,7 @@ async function main() {
     'dhikr_counts',
     userIdColumns.get('dhikr_counts')!,
     options.userId,
+    columns,
     mapDhikrCount,
     async (rows) => (await db
       .insert(faithDhikrCounts)
@@ -571,6 +645,7 @@ async function main() {
     'memorization_log',
     userIdColumns.get('memorization_log')!,
     options.userId,
+    columns,
     mapMemorizationLog,
     async (rows) => (await db
       .insert(faithMemorizationLogs)
@@ -587,6 +662,7 @@ async function main() {
     'raku_progress',
     userIdColumns.get('raku_progress')!,
     options.userId,
+    columns,
     mapRakuProgress,
     async (rows) => (await db
       .insert(faithRakuProgress)
@@ -603,6 +679,7 @@ async function main() {
     'vocab_bank',
     userIdColumns.get('vocab_bank')!,
     options.userId,
+    columns,
     mapVocabWord,
     async (rows) => (await db
       .insert(faithVocabBank)
@@ -615,7 +692,8 @@ async function main() {
   const settingsResult = await copySettings(
     sourceSql,
     userIdColumns.get('settings')!,
-    options.userId
+    options.userId,
+    columns
   );
   console.log(
     `settings: scanned ${settingsResult.scanned}; Faith settings inserted ${settingsResult.faithInserted}; Gemini keys transferred ${settingsResult.geminiTransferred}; skipped/retained ${settingsResult.skipped}.`
@@ -623,11 +701,14 @@ async function main() {
   console.log('SK URL/API and pull-secret credentials were not copied.');
 }
 
-async function fetchAllSettingNames(sourceSql: SourceSql): Promise<string[]> {
+async function fetchAllSettingNames(
+  sourceSql: SourceSql,
+  columns: LegacyColumns
+): Promise<string[]> {
   const keys = new Set<string>();
   let lastId: number | null = null;
   for (;;) {
-    const rows = await fetchBatch(sourceSql, 'settings', lastId);
+    const rows = await fetchBatch(sourceSql, 'settings', lastId, columns);
     if (rows.length === 0) break;
     for (const row of rows) keys.add(requiredString(row.key, 'key'));
     lastId = optionalInteger(rows[rows.length - 1].id, Number.NaN);
