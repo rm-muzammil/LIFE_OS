@@ -4,6 +4,7 @@ import {
   text,
   real,
   boolean,
+  integer,
   timestamp,
   jsonb,
   serial,
@@ -268,6 +269,74 @@ export const wealthSettings = pgTable(
   })
 );
 
+export const personalDailyLogs = pgTable(
+  'personal_daily_logs',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    workoutDone: boolean('workout_done').default(false),
+    allSetsDone: boolean('all_sets_done').default(false),
+    effortRating: integer('effort_rating').default(0),
+    isRestDay: boolean('is_rest_day').default(false),
+    calories: integer('calories').default(0),
+    protein: integer('protein').default(0),
+    meals: boolean('meals').default(false),
+    sleepHours: real('sleep_hours').default(0),
+    productiveHours: real('productive_hours').default(0),
+    socialMediaOk: boolean('social_media_ok').default(false),
+    helpedSomeone: boolean('helped_someone').default(false),
+    contactedParents: boolean('contacted_parents').default(false),
+    familyTies: boolean('family_ties').default(false),
+    charityAmount: integer('charity_amount').default(0),
+    goodDeeds: integer('good_deeds').default(0),
+    totalScore: integer('total_score').default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userDateUnique: unique().on(table.userId, table.date),
+    userDateIdx: index('personal_daily_logs_user_date_idx').on(table.userId, table.date),
+  })
+);
+
+export const personalWorkoutPlans = pgTable(
+  'personal_workout_plans',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    weekStart: text('week_start').notNull(),
+    day: text('day').notNull(),
+    date: text('date').notNull(),
+    plan: jsonb('plan').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userDateUnique: unique().on(table.userId, table.date),
+    userDateIdx: index('personal_workout_plans_user_date_idx').on(table.userId, table.date),
+  })
+);
+
+export const personalExerciseLogs = pgTable(
+  'personal_exercise_logs',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    exerciseName: text('exercise_name').notNull(),
+    setsPlanned: integer('sets_planned').default(0),
+    setsCompleted: integer('sets_completed').default(0),
+    reps: text('reps').notNull().default(''),
+    notes: text('notes').default(''),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userDateExerciseUnique: unique().on(table.userId, table.date, table.exerciseName),
+    userDateIdx: index('personal_exercise_logs_user_date_idx').on(table.userId, table.date),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -296,3 +365,9 @@ export type WealthDebt = typeof wealthDebts.$inferSelect;
 export type NewWealthDebt = typeof wealthDebts.$inferInsert;
 export type WealthSetting = typeof wealthSettings.$inferSelect;
 export type NewWealthSetting = typeof wealthSettings.$inferInsert;
+export type PersonalDailyLog = typeof personalDailyLogs.$inferSelect;
+export type NewPersonalDailyLog = typeof personalDailyLogs.$inferInsert;
+export type PersonalWorkoutPlan = typeof personalWorkoutPlans.$inferSelect;
+export type NewPersonalWorkoutPlan = typeof personalWorkoutPlans.$inferInsert;
+export type PersonalExerciseLog = typeof personalExerciseLogs.$inferSelect;
+export type NewPersonalExerciseLog = typeof personalExerciseLogs.$inferInsert;

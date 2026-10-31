@@ -11,6 +11,7 @@ import {
   NotebookPen,
   BookOpen,
   Building2,
+  Dumbbell,
   Wallet,
   Settings,
   CalendarDays,
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Weekly Review', icon: NotebookPen },
   { href: '/hadith', label: 'Hadith', icon: BookOpen },
+  { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/provinces', label: 'Provinces', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -84,7 +86,10 @@ export default function Sidebar() {
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href === '/wealth' && pathname.startsWith('/wealth/'));
+          const active =
+            pathname === href ||
+            (href === '/wealth' && pathname.startsWith('/wealth/')) ||
+            (href === '/personal' && pathname.startsWith('/personal/'));
           return (
             <Link
               key={href}
