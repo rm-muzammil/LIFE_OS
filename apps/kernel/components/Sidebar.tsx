@@ -14,6 +14,7 @@ import {
   Dumbbell,
   Wallet,
   UsersRound,
+  Briefcase,
   Settings,
   CalendarDays,
   MessageCircle,
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/relationships', label: 'Relationships', icon: UsersRound },
+  { href: '/work', label: 'Work', icon: Briefcase },
   { href: '/provinces', label: 'Provinces', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -92,7 +94,8 @@ export default function Sidebar() {
             pathname === href ||
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
             (href === '/personal' && pathname.startsWith('/personal/')) ||
-            (href === '/relationships' && pathname.startsWith('/relationships/'));
+            (href === '/relationships' && pathname.startsWith('/relationships/')) ||
+            (href === '/work' && pathname.startsWith('/work/'));
           return (
             <Link
               key={href}

@@ -13,7 +13,10 @@ import {
   unique,
   index,
   primaryKey,
+  foreignKey,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // 1. provinces — registry + cache
 export const provinces = pgTable(
@@ -375,6 +378,62 @@ export const relationshipsSettings = pgTable(
   })
 );
 
+export const workProjects = pgTable(
+  'work_projects',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    status: text('status').notNull().default('active'),
+    targetDate: text('target_date'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    statusCheck: check(
+      'work_projects_status_check',
+      sql`${table.status} IN ('active', 'paused', 'completed')`
+    ),
+    userStatusCreatedAtIdx: index('work_projects_user_status_created_at_idx').on(
+      table.userId,
+      table.status,
+      table.createdAt
+    ),
+  })
+);
+
+export const workDailyLogs = pgTable(
+  'work_daily_logs',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    logDate: text('log_date').notNull(),
+    deepWorkHours: real('deep_work_hours').notNull().default(0),
+    tasksCompleted: integer('tasks_completed').notNull().default(0),
+    milestoneDone: boolean('milestone_done').notNull().default(false),
+    profDevMinutes: integer('prof_dev_minutes').notNull().default(0),
+    noProcrastination: boolean('no_procrastination').notNull().default(false),
+    clientDeliverable: boolean('client_deliverable').notNull().default(false),
+    projectId: uuid('project_id'),
+    notes: text('notes'),
+    score: integer('score').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userDateUnique: unique().on(table.userId, table.logDate),
+    userDateIdx: index('work_daily_logs_user_date_idx').on(table.userId, table.logDate),
+    userProjectFk: foreignKey({
+      name: 'work_daily_logs_user_project_fk',
+      columns: [table.userId, table.projectId],
+      foreignColumns: [workProjects.userId, workProjects.id],
+    }),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -413,3 +472,7 @@ export type RelationshipsDailyLog = typeof relationshipsDailyLogs.$inferSelect;
 export type NewRelationshipsDailyLog = typeof relationshipsDailyLogs.$inferInsert;
 export type RelationshipsSetting = typeof relationshipsSettings.$inferSelect;
 export type NewRelationshipsSetting = typeof relationshipsSettings.$inferInsert;
+export type WorkProject = typeof workProjects.$inferSelect;
+export type NewWorkProject = typeof workProjects.$inferInsert;
+export type WorkDailyLog = typeof workDailyLogs.$inferSelect;
+export type NewWorkDailyLog = typeof workDailyLogs.$inferInsert;
