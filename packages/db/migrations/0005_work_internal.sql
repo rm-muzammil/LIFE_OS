@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS "work_daily_logs" (
 	CONSTRAINT "work_daily_logs_user_id_id_pk" PRIMARY KEY("user_id", "id"),
 	CONSTRAINT "work_daily_logs_user_id_log_date_unique" UNIQUE("user_id", "log_date"),
 	CONSTRAINT "work_daily_logs_user_project_fk" FOREIGN KEY ("user_id", "project_id")
-		REFERENCES "work_projects" ("user_id", "id")
+		REFERENCES "work_projects" ("user_id", "id") ON DELETE SET NULL ("project_id")
 );
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "work_projects_user_status_created_at_idx"
