@@ -1,5 +1,7 @@
 import type { ScoreBreakdown } from '@/lib/work/types';
 
+export const SCORE_CAP = 100;
+
 export interface ScoreInput {
   deepWorkHours: number;
   tasksCompleted: number;
@@ -16,7 +18,7 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
   const profDev = input.profDevMinutes >= 30 ? 15 : 0;
   const noProcrastin = input.noProcrastination ? 10 : 0;
   const clientBonus = input.clientDeliverable ? 10 : 0;
-  const total = Math.min(100, Math.round(deepWork + tasks + milestone + profDev + noProcrastin + clientBonus));
+  const total = Math.min(SCORE_CAP, Math.round(deepWork + tasks + milestone + profDev + noProcrastin + clientBonus));
 
   return {
     deepWork: Math.round(deepWork * 10) / 10,
