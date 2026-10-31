@@ -13,6 +13,7 @@ import {
   Wallet,
   UsersRound,
   Briefcase,
+  Moon,
   CalendarDays,
   MessageCircle,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: '/life-score', label: 'Score', icon: TrendingUp },
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Review', icon: NotebookPen },
+  { href: '/faith', label: 'Faith', icon: Moon },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/relationships', label: 'Relationships', icon: UsersRound },
@@ -46,13 +48,14 @@ export default function BottomNav() {
             (href === '/personal' && pathname.startsWith('/personal/')) ||
             (href === '/relationships' && pathname.startsWith('/relationships/')) ||
             (href === '/work' && pathname.startsWith('/work/'));
+          const isFaithActive = href === '/faith' && pathname.startsWith('/faith/');
           return (
             <Link
               key={href}
               href={href}
               className={clsx(
                 'flex flex-col items-center justify-center gap-1 h-full min-w-[64px] shrink-0 px-1 text-[10px] font-medium transition-colors',
-                active ? 'text-brand-400' : 'text-zinc-600'
+                active || isFaithActive ? 'text-brand-400' : 'text-zinc-600'
               )}
             >
               <Icon size={20} strokeWidth={2} />

@@ -15,6 +15,7 @@ import {
   Wallet,
   UsersRound,
   Briefcase,
+  Moon,
   Settings,
   CalendarDays,
   MessageCircle,
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { href: '/character', label: 'Character', icon: Heart },
   { href: '/review', label: 'Weekly Review', icon: NotebookPen },
   { href: '/hadith', label: 'Hadith', icon: BookOpen },
+  { href: '/faith', label: 'Faith', icon: Moon },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/relationships', label: 'Relationships', icon: UsersRound },
@@ -96,13 +98,14 @@ export default function Sidebar() {
             (href === '/personal' && pathname.startsWith('/personal/')) ||
             (href === '/relationships' && pathname.startsWith('/relationships/')) ||
             (href === '/work' && pathname.startsWith('/work/'));
+          const isFaithActive = href === '/faith' && pathname.startsWith('/faith/');
           return (
             <Link
               key={href}
               href={href}
               className={clsx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                active
+                active || isFaithActive
                   ? 'bg-brand-500/10 text-brand-400'
                   : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900'
               )}
