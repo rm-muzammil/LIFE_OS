@@ -62,7 +62,18 @@ function RelationshipsLogPageInner() {
         { cache: 'no-store' }
       );
       const data = await readRelationshipsResponse<LogResponse>(response);
-      setForm(data.log ? { ...EMPTY, ...data.log } : EMPTY);
+      setForm(data.log
+        ? {
+            contactedParents: data.log.contactedParents,
+            familyTies: data.log.familyTies,
+            helpedSomeone: data.log.helpedSomeone,
+            goodDeed: data.log.goodDeed,
+            communityObligation: data.log.communityObligation,
+            charityAmount: data.log.charityAmount,
+            goodDeedsCount: data.log.goodDeedsCount,
+            notes: data.log.notes ?? '',
+          }
+        : EMPTY);
       setWeeklyReflection(data.weeklyReflection);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load this day’s log.');
