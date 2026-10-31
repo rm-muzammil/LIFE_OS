@@ -31,7 +31,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Relationships',
     slug: 'relationships',
-    url: 'https://your-relationships-app.vercel.app',
+    url: '/relationships',
     weight: 0.1,
   },
   {
