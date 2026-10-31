@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { faithVocabBank } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
 import { isFiniteInteger, isRecord, isUuid } from '@/lib/faith/validation';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       status: typeof body.status === 'string' ? body.status : 'new',
     })
     .returning();
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json(row, { status: 201 });
 }
 
@@ -81,5 +83,6 @@ export async function DELETE(req: NextRequest) {
   await db
     .delete(faithVocabBank)
     .where(and(eq(faithVocabBank.userId, userId), eq(faithVocabBank.id, id)));
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }

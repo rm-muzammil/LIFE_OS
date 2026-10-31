@@ -3,6 +3,7 @@ import { getApiUserId } from '@/lib/auth';
 import { defaultDailyLog, getDailyLog, saveDailyLog } from '@/lib/faith/daily-log';
 import { getFaithVerseIndex, advanceFaithVerseIndexOnce, setFaithSetting } from '@/lib/faith/settings';
 import { isFiniteInteger, isRecord } from '@/lib/faith/validation';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,7 @@ export async function POST() {
     : defaultDailyLog(date);
   input.verseDone = true;
   await saveDailyLog(userId, input);
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ index, verseDone: true });
 }
 
@@ -71,5 +73,6 @@ export async function PUT(req: NextRequest) {
   const { TOTAL_JUZ30_VERSES } = await import('@/lib/faith/quran-index');
   const safeIndex = Math.max(0, Math.min(body.index, TOTAL_JUZ30_VERSES - 1));
   await setFaithSetting(userId, 'current_verse_index', String(safeIndex));
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ index: safeIndex });
 }

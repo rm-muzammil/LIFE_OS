@@ -6,6 +6,7 @@ import { getApiUserId } from '@/lib/auth';
 import { isDateString } from '@/lib/faith/date';
 import { syncDailyLogFromDhikr } from '@/lib/faith/dhikr';
 import { isFiniteInteger, isRecord } from '@/lib/faith/validation';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,5 +73,6 @@ export async function POST(req: NextRequest) {
     });
 
   await syncDailyLogFromDhikr(userId, body.date, body.dhikrKey, completed);
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ ok: true, count: body.count, completed });
 }

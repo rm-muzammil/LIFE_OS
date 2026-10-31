@@ -11,6 +11,7 @@ import {
 import { isDateString } from '@/lib/faith/date';
 import { advanceFaithVerseIndexOnce } from '@/lib/faith/settings';
 import { isFiniteInteger, isRecord } from '@/lib/faith/validation';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,5 +105,6 @@ export async function POST(req: NextRequest) {
     await advanceFaithVerseIndexOnce(userId, fields.date, 564);
   }
   const streak = await computeFaithStreak(userId, fields.date);
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ ok: true, score: row.finalScore, streak, row });
 }

@@ -6,6 +6,7 @@ import { getApiUserId } from '@/lib/auth';
 import { generateDailyGuidance } from '@/lib/faith/guidance';
 import { getHijriDate } from '@/lib/faith/hijri';
 import { getUserGeminiKeys } from '@/lib/gemini';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,5 +80,6 @@ export async function DELETE() {
       target: [faithSettings.userId, faithSettings.key],
       set: { value: '', updatedAt: now },
     });
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }

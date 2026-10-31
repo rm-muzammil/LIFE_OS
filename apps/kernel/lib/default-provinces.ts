@@ -7,7 +7,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Faith',
     slug: 'faith',
-    url: 'https://faithtracker.vercel.app',
+    url: '/faith',
     weight: 0.25,
   },
   {

@@ -5,6 +5,7 @@ import { faithSettings } from '@/db/schema';
 import { getApiUserId } from '@/lib/auth';
 import { isRecord } from '@/lib/faith/validation';
 import { setFaithSetting } from '@/lib/faith/settings';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,5 +60,6 @@ export async function POST(req: NextRequest) {
   for (const [key, value] of updates) {
     await setFaithSetting(userId, key, value);
   }
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json({ ok: true });
 }

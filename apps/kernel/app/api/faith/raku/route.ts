@@ -9,6 +9,7 @@ import {
   saveDailyLog,
 } from '@/lib/faith/daily-log';
 import { isFiniteInteger, isRecord } from '@/lib/faith/validation';
+import { refreshFaithProvinceScore } from '@/lib/faith/refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,5 +138,6 @@ export async function POST(req: NextRequest) {
     await saveDailyLog(userId, input);
   }
 
+  await refreshFaithProvinceScore(userId);
   return NextResponse.json(row);
 }

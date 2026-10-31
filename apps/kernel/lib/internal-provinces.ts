@@ -1,6 +1,7 @@
 import { computeWealthScore } from '@/lib/wealth/score';
 import { computePersonalScore } from '@/lib/personal/score';
 import { computeRelationshipsScore } from '@/lib/relationships/score';
+import { computeFaithScore } from '@/lib/faith/score';
 import { computeWorkScore } from '@/lib/work/report';
 import { db } from '@/db';
 import { provinces, provinceDailySnapshots } from '@/db/schema';
@@ -16,6 +17,7 @@ export const INTERNAL_PROVINCES: Partial<Record<string, InternalProvinceScorer>>
   wealth: computeWealthScore,
   personal: computePersonalScore,
   relationships: computeRelationshipsScore,
+  faith: computeFaithScore,
   work: computeWorkScore,
 };
 
