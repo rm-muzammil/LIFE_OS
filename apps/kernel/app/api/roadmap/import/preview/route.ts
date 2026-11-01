@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const preview = await prepareImportPreview(userId, parsed);
     return NextResponse.json(preview);
   } catch {
-    console.error('Roadmap CSV preview duplicate lookup failed.');
+    console.error('Roadmap CSV preview preparation failed.');
     return NextResponse.json({ error: 'CSV preview could not be completed' }, { status: 500 });
   }
 }

@@ -131,6 +131,22 @@ export default function RoadmapImportPage() {
     }
   }
 
+  async function cancelPreview() {
+    if (!preview) return;
+    setError(null);
+    try {
+      await roadmapRequest(`/api/roadmap/import/batches/${preview.batchId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      setPreview(null);
+      await refreshBatches();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to cancel this preview.');
+    }
+  }
+
   async function requestDelete(batch: ImportBatch) {
     setError(null);
     try {
@@ -251,7 +267,7 @@ export default function RoadmapImportPage() {
             <button type="button" onClick={() => void confirmImport()} disabled={confirming || preview.preview.importableCounts.goal + preview.preview.importableCounts.milestone + preview.preview.importableCounts.task === 0} className="btn-primary">
               {confirming ? 'Importing…' : 'Confirm import'}
             </button>
-            <button type="button" onClick={() => setPreview(null)} disabled={confirming} className="btn-secondary">Cancel preview</button>
+            <button type="button" onClick={() => void cancelPreview()} disabled={confirming} className="btn-secondary">Cancel preview</button>
           </div>
         </section>
       )}

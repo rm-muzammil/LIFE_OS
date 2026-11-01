@@ -46,18 +46,15 @@ export default function RoadmapTaskRow({
           value={task.status}
           onChange={(event) => {
             const value = event.target.value;
-            if (STATUS_OPTIONS.some((status) => status === value)) {
-              onStatus(task, value as (typeof STATUS_OPTIONS)[number]);
-            } else if (value === 'suggested') {
-              onStatus(task, 'todo');
-            }
+            const status = STATUS_OPTIONS.find((option) => option === value);
+            if (status) onStatus(task, status);
           }}
           className="input !w-auto !px-2 !py-1 text-xs capitalize"
         >
           <option value="todo">To do</option>
           <option value="done">Done</option>
           <option value="skipped">Skipped</option>
-          {task.status === 'suggested' && <option value="suggested">Suggested</option>}
+          {task.status === 'suggested' && <option value="suggested" disabled>Suggested</option>}
         </select>
         <button
           type="button"
