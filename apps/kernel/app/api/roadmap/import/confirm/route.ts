@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
 import { parseUpload, confirmImport } from '@/lib/roadmap/import';
 import { MAX_CSV_BYTES } from '@/lib/roadmap/csv';
-import { isUuid } from '@/lib/roadmap/repo';
+import { isUuid, purgeExpiredPendingImportBatches } from '@/lib/roadmap/repo';
 import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +11,12 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const userId = await getApiUserId();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    await purgeExpiredPendingImportBatches(userId);
+  } catch {
+    console.error('Roadmap expired preview cleanup failed.');
+    return NextResponse.json({ error: 'Expired previews could not be cleaned up' }, { status: 500 });
+  }
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_CSV_BYTES + 16_384) {
     return NextResponse.json({ error: 'CSV upload exceeds the 1 MB limit' }, { status: 413 });

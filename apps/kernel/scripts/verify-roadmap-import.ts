@@ -115,7 +115,13 @@ async function main() {
   assert.deepEqual(repeated, { kind: 'conflict', status: 'done' });
 
   await assert.rejects(
-    confirmImport(userId, preview.batchId, new TextEncoder().encode('different file'), preview.filename, store),
+    confirmImport(
+      userId,
+      preview.batchId,
+      new TextEncoder().encode(ROADMAP_CSV_TEMPLATE.replaceAll('Learn Arabic', 'Study another language')),
+      preview.filename,
+      store
+    ),
     /does not match the previewed file/
   );
   console.log('Roadmap CSV template preview: 1 goal, 1 milestone, 1 task; 0 errors.');

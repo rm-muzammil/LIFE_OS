@@ -1,15 +1,52 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/db';
-import { roadmapTasks } from '@/db/schema';
+import { roadmapGoals, roadmapMilestones, roadmapTasks } from '@/db/schema';
 import { addDays, todayPKT } from '@/lib/faith/date';
 
-export interface RoadmapReport {
+const SCORE_WINDOW_DAYS = 14;
+
+type TaskStatus = 'todo' | 'done' | 'skipped' | 'suggested';
+type GoalStatus = 'active' | 'done' | 'paused';
+type MilestoneStatus = 'active' | 'done' | 'paused';
+
+export interface RoadmapScoreTask {
+  status: TaskStatus;
+  dueDate: string | null;
+  completedAt: Date | null;
+}
+
+export interface RoadmapScoreGoal {
+  id: string;
+  status: GoalStatus;
+}
+
+export interface RoadmapScoreMilestone {
+  goalId: string;
+  status: MilestoneStatus;
+}
+
+export interface RoadmapScoreInput {
+  today: string;
+  tasks: RoadmapScoreTask[];
+  goals: RoadmapScoreGoal[];
+  milestones: RoadmapScoreMilestone[];
+  updatedAt?: string;
+}
+
+export interface RoadmapScoreResult {
   score: number;
   label: 'Roadmap';
   streak: number;
   todayDone: boolean;
   updatedAt: string;
+  scoreBreakdown: {
+    completion: number;
+    overdueControl: number;
+    milestoneProgress: number;
+    streak: number;
+  };
   details: {
+    empty: boolean;
     todayTotal: number;
     todayCompleted: number;
     activeTasks: number;
@@ -17,65 +54,163 @@ export interface RoadmapReport {
   };
 }
 
-export async function computeRoadmapScore(userId: string): Promise<RoadmapReport> {
-  const today = todayPKT();
-  const completedDate = sql<string>`to_char(${roadmapTasks.completedAt} AT TIME ZONE 'Asia/Karachi', 'YYYY-MM-DD')`;
-  const [todayTasks, completedDays, activeTasks, completedTasks] = await Promise.all([
-    db
-      .select({ status: roadmapTasks.status })
-      .from(roadmapTasks)
-      .where(and(
-        eq(roadmapTasks.userId, userId),
-        eq(roadmapTasks.dueDate, today),
-        sql`${roadmapTasks.status} IN ('todo', 'done')`
-      )),
-    db
-      .select({ date: completedDate })
-      .from(roadmapTasks)
-      .where(and(eq(roadmapTasks.userId, userId), isNotNull(roadmapTasks.completedAt)))
-      .groupBy(completedDate),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(roadmapTasks)
-      .where(and(eq(roadmapTasks.userId, userId), eq(roadmapTasks.status, 'todo'))),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(roadmapTasks)
-      .where(and(eq(roadmapTasks.userId, userId), eq(roadmapTasks.status, 'done'))),
-  ]);
+function pktDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
-  const todayCompleted = todayTasks.filter((task) => task.status === 'done').length;
-  const todayTotal = todayTasks.filter((task) => task.status === 'todo').length;
-  const todayActionable = todayTasks.length;
-  const todayDone = todayActionable > 0 && todayTotal === 0;
-  const score =
-    todayActionable === 0
-      ? 0
-      : Math.round((todayCompleted / todayActionable) * 100);
+function isInWindow(date: string | null, start: string, end: string): boolean {
+  return date !== null && date >= start && date <= end;
+}
 
-  const completed = new Set(completedDays.map((row) => row.date));
-  let cursor = today;
-  if (!completed.has(cursor)) {
-    cursor = addDays(cursor, -1);
-    if (!completed.has(cursor)) cursor = '';
-  }
+function roundedPoints(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export function calculateRoadmapScore(input: RoadmapScoreInput): RoadmapScoreResult {
+  const windowStart = addDays(input.today, -(SCORE_WINDOW_DAYS - 1));
+  const acceptedTasks = input.tasks.filter((task) => task.status !== 'suggested');
+  const completedDays = new Set(
+    acceptedTasks
+      .flatMap((task) =>
+        task.status === 'done' && task.completedAt ? [pktDate(task.completedAt)] : []
+      )
+  );
+  const inWindowTasks = acceptedTasks.filter((task) => {
+    const completedDate = task.completedAt ? pktDate(task.completedAt) : null;
+    return isInWindow(task.dueDate, windowStart, input.today) ||
+      isInWindow(completedDate, windowStart, input.today);
+  });
+  const completedInWindow = inWindowTasks.filter(
+    (task) => task.status === 'done' &&
+      task.completedAt !== null &&
+      isInWindow(pktDate(task.completedAt), windowStart, input.today)
+  ).length;
+  const openTasks = acceptedTasks.filter((task) => task.status === 'todo');
+  const overdueTasks = openTasks.filter(
+    (task) => task.dueDate !== null && task.dueDate < input.today
+  );
+
+  const activeGoalIds = new Set(
+    input.goals.filter((goal) => goal.status === 'active').map((goal) => goal.id)
+  );
+  const eligibleMilestones = input.milestones.filter(
+    (milestone) =>
+      activeGoalIds.has(milestone.goalId) &&
+      (milestone.status === 'active' || milestone.status === 'done')
+  );
+  const completedMilestones = eligibleMilestones.filter(
+    (milestone) => milestone.status === 'done'
+  ).length;
+
   let streak = 0;
-  while (cursor && completed.has(cursor)) {
+  let streakCursor = completedDays.has(input.today)
+    ? input.today
+    : completedDays.has(addDays(input.today, -1))
+      ? addDays(input.today, -1)
+      : '';
+  while (streakCursor && completedDays.has(streakCursor)) {
     streak += 1;
-    cursor = addDays(cursor, -1);
+    streakCursor = addDays(streakCursor, -1);
   }
+
+  const empty = acceptedTasks.length === 0;
+  const scoreBreakdown = empty
+    ? { completion: 0, overdueControl: 0, milestoneProgress: 0, streak: 0 }
+    : {
+        completion: roundedPoints(
+          inWindowTasks.length === 0 ? 0 : (50 * completedInWindow) / inWindowTasks.length
+        ),
+        overdueControl: roundedPoints(
+          openTasks.length === 0
+            ? 20
+            : (20 * (openTasks.length - overdueTasks.length)) / openTasks.length
+        ),
+        milestoneProgress: roundedPoints(
+          eligibleMilestones.length === 0
+            ? 20
+            : (20 * completedMilestones) / eligibleMilestones.length
+        ),
+        streak: roundedPoints((10 * Math.min(streak, SCORE_WINDOW_DAYS)) / SCORE_WINDOW_DAYS),
+      };
+  const score = empty
+    ? 0
+    : Math.round(
+        scoreBreakdown.completion +
+          scoreBreakdown.overdueControl +
+          scoreBreakdown.milestoneProgress +
+          scoreBreakdown.streak
+      );
+  const todayTotal = openTasks.filter(
+    (task) => task.dueDate !== null && task.dueDate <= input.today
+  ).length;
+  const todayCompleted = acceptedTasks.filter(
+    (task) => task.status === 'done' && task.dueDate === input.today
+  ).length;
+  const hasDueTasks = acceptedTasks.some(
+    (task) =>
+      (task.status === 'todo' || task.status === 'done') &&
+      task.dueDate !== null &&
+      task.dueDate <= input.today
+  );
 
   return {
     score,
     label: 'Roadmap',
     streak,
-    todayDone,
-    updatedAt: new Date().toISOString(),
+    todayDone: hasDueTasks && todayTotal === 0,
+    updatedAt: input.updatedAt ?? new Date().toISOString(),
+    scoreBreakdown,
     details: {
+      empty,
       todayTotal,
       todayCompleted,
-      activeTasks: activeTasks[0]?.count ?? 0,
-      completedTasks: completedTasks[0]?.count ?? 0,
+      activeTasks: openTasks.length,
+      completedTasks: acceptedTasks.filter((task) => task.status === 'done').length,
     },
   };
+}
+
+export async function computeRoadmapScore(userId: string): Promise<RoadmapScoreResult> {
+  const [tasks, goals, milestones] = await Promise.all([
+    db.select({
+      status: roadmapTasks.status,
+      dueDate: roadmapTasks.dueDate,
+      completedAt: roadmapTasks.completedAt,
+    }).from(roadmapTasks).where(and(
+      eq(roadmapTasks.userId, userId),
+      ne(roadmapTasks.status, 'suggested')
+    )),
+    db.select({
+      id: roadmapGoals.id,
+      status: roadmapGoals.status,
+    }).from(roadmapGoals).where(eq(roadmapGoals.userId, userId)),
+    db.select({
+      goalId: roadmapMilestones.goalId,
+      status: roadmapMilestones.status,
+    }).from(roadmapMilestones).where(eq(roadmapMilestones.userId, userId)),
+  ]);
+
+  return calculateRoadmapScore({
+    today: todayPKT(),
+    tasks: tasks.map((task) => ({
+      status: task.status as TaskStatus,
+      dueDate: task.dueDate,
+      completedAt: task.completedAt,
+    })),
+    goals: goals.map((goal) => ({
+      id: goal.id,
+      status: goal.status as GoalStatus,
+    })),
+    milestones: milestones.map((milestone) => ({
+      goalId: milestone.goalId,
+      status: milestone.status as MilestoneStatus,
+    })),
+  });
 }

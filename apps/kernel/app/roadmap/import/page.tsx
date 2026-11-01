@@ -57,6 +57,7 @@ export default function RoadmapImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [failedBatches, setFailedBatches] = useState<ImportBatch[]>([]);
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewing, setPreviewing] = useState(false);
@@ -66,8 +67,12 @@ export default function RoadmapImportPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   const refreshBatches = useCallback(async () => {
-    const result = await roadmapRequest<{ batches: ImportBatch[] }>('/api/roadmap/import/batches', { cache: 'no-store' });
+    const result = await roadmapRequest<{
+      batches: ImportBatch[];
+      failedBatches: ImportBatch[];
+    }>('/api/roadmap/import/batches', { cache: 'no-store' });
     setBatches(result.batches);
+    setFailedBatches(result.failedBatches);
   }, []);
 
   useEffect(() => {
@@ -274,11 +279,11 @@ export default function RoadmapImportPage() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-200">Import history</h2>
+          <h2 className="text-sm font-semibold text-zinc-200">Completed import history</h2>
           <button type="button" onClick={() => void refreshBatches()} className="text-xs text-brand-300">Refresh</button>
         </div>
         {loading ? <p className="text-sm text-zinc-500">Loading imports…</p> : batches.length === 0 ? (
-          <p className="card p-4 text-sm text-zinc-500">No imports yet.</p>
+          <p className="card p-4 text-sm text-zinc-500">No completed imports yet.</p>
         ) : batches.map((batch) => (
           <div key={batch.id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
             <div className="min-w-0">
@@ -303,6 +308,34 @@ export default function RoadmapImportPage() {
           </div>
         ))}
       </section>
+
+      {failedBatches.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-zinc-200">Failed imports · delete to clean up</h2>
+          {failedBatches.map((batch) => (
+            <div key={batch.id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-200">{batch.filename}</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Failed · {batch.rowCount} rows ({batch.goalCount} goals, {batch.milestoneCount} milestones, {batch.taskCount} tasks)
+                </p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  {formatDate(batch.completedAt ?? batch.createdAt)}
+                  {batch.errorCount > 0 ? ` · ${batch.errorCount} with issues` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void requestDelete(batch)}
+                aria-label={`Delete failed ${batch.filename} import`}
+                className="rounded-lg p-2 text-zinc-600 hover:bg-red-500/10 hover:text-red-300"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {deleteState && (
         <div role="dialog" aria-modal="true" aria-labelledby="delete-batch-title" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">

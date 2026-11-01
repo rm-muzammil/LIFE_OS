@@ -488,8 +488,49 @@ export async function listImportBatches(userId: string) {
     createdAt: roadmapImportBatches.createdAt,
     completedAt: roadmapImportBatches.completedAt,
   }).from(roadmapImportBatches)
-    .where(eq(roadmapImportBatches.userId, userId))
+    .where(and(
+      eq(roadmapImportBatches.userId, userId),
+      eq(roadmapImportBatches.status, 'done')
+    ))
     .orderBy(sql`${roadmapImportBatches.createdAt} DESC`);
+}
+
+export async function listFailedImportBatches(userId: string) {
+  return db.select({
+    id: roadmapImportBatches.id,
+    filename: roadmapImportBatches.filename,
+    status: roadmapImportBatches.status,
+    rowCount: roadmapImportBatches.rowCount,
+    goalCount: roadmapImportBatches.goalCount,
+    milestoneCount: roadmapImportBatches.milestoneCount,
+    taskCount: roadmapImportBatches.taskCount,
+    skippedCount: roadmapImportBatches.skippedCount,
+    errorCount: roadmapImportBatches.errorCount,
+    createdAt: roadmapImportBatches.createdAt,
+    completedAt: roadmapImportBatches.completedAt,
+  }).from(roadmapImportBatches)
+    .where(and(
+      eq(roadmapImportBatches.userId, userId),
+      eq(roadmapImportBatches.status, 'failed')
+    ))
+    .orderBy(sql`${roadmapImportBatches.createdAt} DESC`);
+}
+
+export async function purgeExpiredPendingImportBatches(
+  userId: string,
+  now: Date = new Date()
+): Promise<number> {
+  const expiredBefore = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const deleted = await db.delete(roadmapImportBatches).where(and(
+    eq(roadmapImportBatches.userId, userId),
+    eq(roadmapImportBatches.status, 'pending'),
+    lt(roadmapImportBatches.createdAt, expiredBefore),
+    or(
+      isNull(roadmapImportBatches.confirmStartedAt),
+      lt(roadmapImportBatches.confirmStartedAt, expiredBefore)
+    )!
+  )).returning({ id: roadmapImportBatches.id });
+  return deleted.length;
 }
 
 export async function getImportBatch(userId: string, id: string) {
