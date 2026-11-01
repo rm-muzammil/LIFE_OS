@@ -4,6 +4,7 @@ import { roadmapGoals, roadmapMilestones, roadmapTasks } from '@/db/schema';
 import { addDays, todayPKT } from '@/lib/faith/date';
 
 const SCORE_WINDOW_DAYS = 14;
+const STREAK_SCORE_CAP_DAYS = 7;
 
 type TaskStatus = 'todo' | 'done' | 'skipped' | 'suggested';
 type GoalStatus = 'active' | 'done' | 'paused';
@@ -84,9 +85,13 @@ export function calculateRoadmapScore(input: RoadmapScoreInput): RoadmapScoreRes
   );
   const inWindowTasks = acceptedTasks.filter((task) => {
     const completedDate = task.completedAt ? pktDate(task.completedAt) : null;
+    // Completion counts tasks due in the window or completed during it.
     return isInWindow(task.dueDate, windowStart, input.today) ||
       isInWindow(completedDate, windowStart, input.today);
   });
+  const tasksDueInWindow = acceptedTasks.filter(
+    (task) => isInWindow(task.dueDate, windowStart, input.today)
+  );
   const completedInWindow = inWindowTasks.filter(
     (task) => task.status === 'done' &&
       task.completedAt !== null &&
@@ -127,17 +132,15 @@ export function calculateRoadmapScore(input: RoadmapScoreInput): RoadmapScoreRes
         completion: roundedPoints(
           inWindowTasks.length === 0 ? 0 : (50 * completedInWindow) / inWindowTasks.length
         ),
-        overdueControl: roundedPoints(
-          openTasks.length === 0
-            ? 20
-            : (20 * (openTasks.length - overdueTasks.length)) / openTasks.length
-        ),
+        overdueControl: roundedPoints(tasksDueInWindow.length === 0
+          ? 0
+          : 20 * (1 - Math.min(1, overdueTasks.length / Math.max(1, tasksDueInWindow.length)))),
         milestoneProgress: roundedPoints(
           eligibleMilestones.length === 0
-            ? 20
+            ? 0
             : (20 * completedMilestones) / eligibleMilestones.length
         ),
-        streak: roundedPoints((10 * Math.min(streak, SCORE_WINDOW_DAYS)) / SCORE_WINDOW_DAYS),
+        streak: roundedPoints((10 * Math.min(streak, STREAK_SCORE_CAP_DAYS)) / STREAK_SCORE_CAP_DAYS),
       };
   const score = empty
     ? 0

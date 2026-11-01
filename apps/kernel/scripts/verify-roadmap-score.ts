@@ -62,7 +62,7 @@ const pausedMilestones = score({
     { goalId: 'paused-goal', status: 'active' },
   ],
 });
-assert.equal(pausedMilestones.scoreBreakdown.milestoneProgress, 20);
+assert.equal(pausedMilestones.scoreBreakdown.milestoneProgress, 0);
 
 const pktBoundary = score({
   tasks: [{
@@ -74,4 +74,38 @@ const pktBoundary = score({
 assert.equal(pktBoundary.scoreBreakdown.completion, 50);
 assert.equal(pktBoundary.streak, 1);
 
-console.log('Roadmap scoring verification passed: empty, 14-day window, old overdue, yesterday streak, suggested exclusion, paused milestones, and PKT date boundary.');
+const futureOnly = score({
+  tasks: [{ status: 'todo', dueDate: '2026-03-16', completedAt: null }],
+});
+assert.equal(futureOnly.scoreBreakdown.completion, 0);
+assert.equal(futureOnly.scoreBreakdown.overdueControl, 0);
+assert.equal(futureOnly.scoreBreakdown.milestoneProgress, 0);
+assert.equal(futureOnly.score, 0);
+console.log(`Fixture (a) future-only roadmap, nothing done: score ${futureOnly.score}.`);
+
+const unfinishedMilestones = score({
+  tasks: [{ status: 'todo', dueDate: today, completedAt: null }],
+  goals: [{ id: 'active-goal', status: 'active' }],
+  milestones: [
+    { goalId: 'active-goal', status: 'active' },
+    { goalId: 'active-goal', status: 'active' },
+  ],
+});
+assert.equal(unfinishedMilestones.scoreBreakdown.milestoneProgress, 0);
+assert.equal(unfinishedMilestones.scoreBreakdown.overdueControl, 20);
+console.log(`Fixture (b) active milestones, none done, task due: milestone points ${unfinishedMilestones.scoreBreakdown.milestoneProgress}.`);
+
+const completedNoMilestones = score({
+  tasks: [
+    { status: 'done', dueDate: today, completedAt: new Date('2026-03-15T08:00:00Z') },
+    { status: 'done', dueDate: '2026-03-14', completedAt: new Date('2026-03-14T08:00:00Z') },
+  ],
+});
+assert.equal(completedNoMilestones.scoreBreakdown.completion, 50);
+assert.equal(completedNoMilestones.scoreBreakdown.overdueControl, 20);
+assert.equal(completedNoMilestones.scoreBreakdown.milestoneProgress, 0);
+assert.equal(completedNoMilestones.scoreBreakdown.streak, 2.86);
+assert.equal(completedNoMilestones.score, 73);
+console.log(`Fixture (c) all tasks done in window, no milestones: completion ${completedNoMilestones.scoreBreakdown.completion} + overdue ${completedNoMilestones.scoreBreakdown.overdueControl} + streak ${completedNoMilestones.scoreBreakdown.streak} = score ${completedNoMilestones.score}.`);
+
+console.log('Roadmap scoring verification passed: empty, 14-day window, old overdue, yesterday streak, suggested exclusion, paused milestones, PKT date boundary, and all three approved-formula fixtures.');
