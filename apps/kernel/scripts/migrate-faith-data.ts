@@ -295,12 +295,29 @@ function mapSetting(
   userIdColumn: UserIdColumn,
   fallbackUserId: string | null
 ): NewFaithSetting {
+  const key = requiredString(row.key, 'key');
   return {
     userId: requiredUserId(row, userIdColumn, fallbackUserId),
-    key: requiredString(row.key, 'key'),
-    value: requiredString(row.value, 'value'),
+    key,
+    value: requiredSettingValue(row.value),
     updatedAt: optionalDateTime(field(row, 'updated_at', 'updatedAt')),
   };
+}
+
+function requiredSettingValue(value: unknown): string {
+  if (typeof value !== 'string') {
+    const reason = value === null ? 'null' : value === undefined ? 'missing' : 'not a string';
+    throw new Error(`value is ${reason}`);
+  }
+  return value;
+}
+
+function settingValidationReason(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown validation error';
+  return error.message
+    .replace(/^Legacy data has an invalid /, '')
+    .replace(/ value\.$/, '')
+    .replace(/\.$/, '');
 }
 
 function settingKind(key: string): 'faith' | 'gemini' | 'excluded' | 'unknown' {
@@ -383,6 +400,13 @@ function naturalKey(
   userIdColumn: UserIdColumn,
   fallbackUserId: string | null
 ): string {
+  if (tableName === 'settings') {
+    const key = row.key;
+    if (typeof key !== 'string' || !['faith', 'gemini'].includes(settingKind(key))) {
+      return `skipped\u0000${row.id}`;
+    }
+    return `${requiredUserId(row, userIdColumn, fallbackUserId)}\u0000${key}`;
+  }
   const userId = requiredUserId(row, userIdColumn, fallbackUserId);
   if (tableName === 'daily_log' || tableName === 'memorization_log') {
     return `${userId}\u0000${requiredDate(row.date)}`;
@@ -472,11 +496,18 @@ async function copySettings(
   userIdColumn: UserIdColumn,
   fallbackUserId: string | null,
   columns: LegacyColumns
-): Promise<{ scanned: number; faithInserted: number; geminiTransferred: number; skipped: number }> {
+): Promise<{
+  scanned: number;
+  faithInserted: number;
+  geminiTransferred: number;
+  skipped: number;
+  invalid: number;
+}> {
   let scanned = 0;
   let faithInserted = 0;
   let geminiTransferred = 0;
   let skipped = 0;
+  let invalid = 0;
   let lastId: number | null = null;
 
   for (;;) {
@@ -484,18 +515,37 @@ async function copySettings(
     if (rows.length === 0) break;
     for (const row of rows) {
       scanned += 1;
-      const key = requiredString(row.key, 'key');
+      if (typeof row.key !== 'string') {
+        skipped += 1;
+        continue;
+      }
+      const key = row.key;
       const kind = settingKind(key);
       if (kind === 'faith') {
-        const setting = mapSetting(row, userIdColumn, fallbackUserId);
+        let setting: NewFaithSetting;
+        try {
+          setting = mapSetting(row, userIdColumn, fallbackUserId);
+        } catch (error) {
+          invalid += 1;
+          console.error(`settings: skipped invalid row for key '${key}': ${settingValidationReason(error)}.`);
+          continue;
+        }
         faithInserted += (await db
           .insert(faithSettings)
           .values(setting)
           .onConflictDoNothing({ target: [faithSettings.userId, faithSettings.key] })
           .returning({ id: faithSettings.id })).length;
       } else if (kind === 'gemini') {
-        const userId = requiredUserId(row, userIdColumn, fallbackUserId);
-        const legacyKey = requiredString(row.value, 'value');
+        let userId: string;
+        let legacyKey: string;
+        try {
+          userId = requiredUserId(row, userIdColumn, fallbackUserId);
+          legacyKey = requiredSettingValue(row.value);
+        } catch (error) {
+          invalid += 1;
+          console.error(`settings: skipped invalid row for key '${key}': ${settingValidationReason(error)}.`);
+          continue;
+        }
         const [existing] = await db
           .select({ geminiKey1: userSettings.geminiKey1 })
           .from(userSettings)
@@ -528,7 +578,7 @@ async function copySettings(
     lastId = optionalInteger(rows[rows.length - 1].id, Number.NaN);
     if (!Number.isInteger(lastId)) throw new Error('settings contains a row without a numeric id.');
   }
-  return { scanned, faithInserted, geminiTransferred, skipped };
+  return { scanned, faithInserted, geminiTransferred, skipped, invalid };
 }
 
 function redactDatabaseUrls(message: string): string {
@@ -696,7 +746,7 @@ async function main() {
     columns
   );
   console.log(
-    `settings: scanned ${settingsResult.scanned}; Faith settings inserted ${settingsResult.faithInserted}; Gemini keys transferred ${settingsResult.geminiTransferred}; skipped/retained ${settingsResult.skipped}.`
+    `settings: scanned ${settingsResult.scanned}; Faith settings inserted ${settingsResult.faithInserted}; Gemini keys transferred ${settingsResult.geminiTransferred}; skipped/retained ${settingsResult.skipped}; invalid ${settingsResult.invalid}.`
   );
   console.log('SK URL/API and pull-secret credentials were not copied.');
 }
@@ -710,7 +760,9 @@ async function fetchAllSettingNames(
   for (;;) {
     const rows = await fetchBatch(sourceSql, 'settings', lastId, columns);
     if (rows.length === 0) break;
-    for (const row of rows) keys.add(requiredString(row.key, 'key'));
+    for (const row of rows) {
+      if (typeof row.key === 'string') keys.add(row.key);
+    }
     lastId = optionalInteger(rows[rows.length - 1].id, Number.NaN);
     if (!Number.isInteger(lastId)) throw new Error('settings contains a row without a numeric id.');
   }
