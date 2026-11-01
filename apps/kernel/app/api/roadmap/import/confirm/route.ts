@@ -5,6 +5,7 @@ import { MAX_CSV_BYTES } from '@/lib/roadmap/csv';
 import { isUuid } from '@/lib/roadmap/repo';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const userId = await getApiUserId();
@@ -22,13 +23,12 @@ export async function POST(request: NextRequest) {
   }
   const file = form.get('file');
   const batchId = form.get('batchId');
-  const expectedHash = form.get('contentHash');
   if (!(file instanceof File)) return NextResponse.json({ error: 'A CSV file is required' }, { status: 400 });
   if (file.size > MAX_CSV_BYTES) {
     return NextResponse.json({ error: 'CSV file exceeds the 1 MB limit' }, { status: 413 });
   }
-  if (!isUuid(batchId) || typeof expectedHash !== 'string' || !/^[0-9a-f]{64}$/.test(expectedHash)) {
-    return NextResponse.json({ error: 'A valid preview batchId and contentHash are required' }, { status: 400 });
+  if (!isUuid(batchId)) {
+    return NextResponse.json({ error: 'A valid preview batchId is required' }, { status: 400 });
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -40,15 +40,10 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'CSV could not be confirmed',
     }, { status: 400 });
   }
-  if (parsed.contentHash !== expectedHash) {
-    return NextResponse.json({ error: 'Uploaded file does not match the previewed file' }, { status: 409 });
-  }
-
   try {
     const result = await confirmImport(
       userId,
       batchId,
-      expectedHash,
       bytes,
       file.name
     );

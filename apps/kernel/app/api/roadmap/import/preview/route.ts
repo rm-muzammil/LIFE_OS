@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
-import { buildPreview, parseUpload } from '@/lib/roadmap/import';
+import { parseUpload, prepareImportPreview } from '@/lib/roadmap/import';
 import { MAX_CSV_BYTES } from '@/lib/roadmap/csv';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
   try {
-    const preview = await buildPreview(userId, parsed);
+    const preview = await prepareImportPreview(userId, parsed);
     return NextResponse.json(preview);
   } catch {
     console.error('Roadmap CSV preview duplicate lookup failed.');

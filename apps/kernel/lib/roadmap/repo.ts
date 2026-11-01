@@ -475,7 +475,19 @@ export async function getBatchDeleteCounts(userId: string, batchId: string) {
 }
 
 export async function listImportBatches(userId: string) {
-  return db.select().from(roadmapImportBatches)
+  return db.select({
+    id: roadmapImportBatches.id,
+    filename: roadmapImportBatches.filename,
+    status: roadmapImportBatches.status,
+    rowCount: roadmapImportBatches.rowCount,
+    goalCount: roadmapImportBatches.goalCount,
+    milestoneCount: roadmapImportBatches.milestoneCount,
+    taskCount: roadmapImportBatches.taskCount,
+    skippedCount: roadmapImportBatches.skippedCount,
+    errorCount: roadmapImportBatches.errorCount,
+    createdAt: roadmapImportBatches.createdAt,
+    completedAt: roadmapImportBatches.completedAt,
+  }).from(roadmapImportBatches)
     .where(eq(roadmapImportBatches.userId, userId))
     .orderBy(sql`${roadmapImportBatches.createdAt} DESC`);
 }

@@ -52,7 +52,7 @@ type TaskInsert = Omit<
 
 export interface RoadmapImportStore {
   createPendingBatch(batch: BatchInsert): Promise<void>;
-  getBatchStatus(userId: string, batchId: string): Promise<string | null>;
+  getBatch(userId: string, batchId: string): Promise<{ status: string; contentHash: string } | null>;
   claimBatch(userId: string, batchId: string): Promise<boolean>;
   insertGoals(rows: GoalInsert[]): Promise<void>;
   insertMilestones(rows: MilestoneInsert[]): Promise<void>;
@@ -64,7 +64,6 @@ export interface RoadmapImportStore {
 export interface RoadmapPreview {
   batchId: string;
   filename: string;
-  contentHash: string;
   preview: RoadmapCsvPreview;
   duplicate: DuplicateWarning;
 }
@@ -99,7 +98,8 @@ export async function buildPreview(
   const duplicate = await lookupDuplicate(userId, parsed.contentHash);
   return {
     batchId: randomUUID(),
-    ...parsed,
+    filename: parsed.filename,
+    preview: parsed.preview,
     duplicate,
   };
 }
@@ -212,9 +212,9 @@ const databaseImportStore: RoadmapImportStore = {
       target: [roadmapImportBatches.userId, roadmapImportBatches.id],
     });
   },
-  async getBatchStatus(userId, batchId) {
+  async getBatch(userId, batchId) {
     const batch = await getImportBatch(userId, batchId);
-    return batch?.status ?? null;
+    return batch ? { status: batch.status, contentHash: batch.contentHash } : null;
   },
   async claimBatch(userId, batchId) {
     const [claimed] = await db.update(roadmapImportBatches)
@@ -260,10 +260,30 @@ const databaseImportStore: RoadmapImportStore = {
   },
 };
 
+export async function prepareImportPreview(
+  userId: string,
+  parsed: ReturnType<typeof parseUpload>
+): Promise<RoadmapPreview> {
+  const preview = await buildPreview(userId, parsed);
+  await databaseImportStore.createPendingBatch({
+    id: preview.batchId,
+    userId,
+    filename: parsed.filename,
+    contentHash: parsed.contentHash,
+    status: 'pending',
+    rowCount: parsed.preview.rows.length,
+    goalCount: parsed.preview.importableCounts.goal,
+    milestoneCount: parsed.preview.importableCounts.milestone,
+    taskCount: parsed.preview.importableCounts.task,
+    skippedCount: parsed.preview.skippedCount,
+    errorCount: parsed.preview.errors.length,
+  });
+  return preview;
+}
+
 export async function confirmImport(
   userId: string,
   batchId: string,
-  expectedHash: string,
   bytes: Uint8Array,
   filename: string,
   store: RoadmapImportStore = databaseImportStore
@@ -272,33 +292,19 @@ export async function confirmImport(
   | { kind: 'success'; counts: { goals: number; milestones: number; tasks: number; skipped: number } }
 > {
   const parsed = parseUpload(bytes, filename);
-  if (parsed.contentHash !== expectedHash) {
+  const { preview } = parsed;
+  const batch = await store.getBatch(userId, batchId);
+  if (!batch) throw new Error('Import preview batch was not found.');
+  if (parsed.contentHash !== batch.contentHash) {
     throw new Error('Uploaded file does not match the previewed file.');
   }
-
-  const { preview } = parsed;
-  await store.createPendingBatch({
-    id: batchId,
-    userId,
-    filename: parsed.filename,
-    contentHash: parsed.contentHash,
-    status: 'pending',
-    rowCount: preview.rows.length,
-    goalCount: preview.importableCounts.goal,
-    milestoneCount: preview.importableCounts.milestone,
-    taskCount: preview.importableCounts.task,
-    skippedCount: preview.skippedCount,
-    errorCount: preview.errors.length,
-  });
-
-  const existingStatus = await store.getBatchStatus(userId, batchId);
-  if (!existingStatus) throw new Error('Import batch could not be created.');
-  if (existingStatus !== 'pending') {
-    return { kind: 'conflict', status: existingStatus };
+  if (batch.status !== 'pending') {
+    return { kind: 'conflict', status: batch.status };
   }
 
   if (!(await store.claimBatch(userId, batchId))) {
-    return { kind: 'conflict', status: existingStatus };
+    const current = await store.getBatch(userId, batchId);
+    return { kind: 'conflict', status: current?.status ?? 'unknown' };
   }
 
   const goalIdsByRow = new Map<number, string>();
