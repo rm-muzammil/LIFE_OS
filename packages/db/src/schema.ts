@@ -567,6 +567,275 @@ export const faithSettings = pgTable(
   })
 );
 
+export const roadmapImportBatches = pgTable(
+  'roadmap_import_batches',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    filename: text('filename').notNull(),
+    contentHash: text('content_hash').notNull(),
+    status: text('status').notNull().default('pending'),
+    rowCount: integer('row_count').notNull().default(0),
+    goalCount: integer('goal_count').notNull().default(0),
+    milestoneCount: integer('milestone_count').notNull().default(0),
+    taskCount: integer('task_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    errorCount: integer('error_count').notNull().default(0),
+    confirmStartedAt: timestamp('confirm_started_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    statusCheck: check(
+      'roadmap_import_batches_status_check',
+      sql`${table.status} IN ('pending', 'done', 'failed')`
+    ),
+    filenameCheck: check(
+      'roadmap_import_batches_filename_check',
+      sql`char_length(${table.filename}) BETWEEN 1 AND 255`
+    ),
+    hashCheck: check(
+      'roadmap_import_batches_hash_check',
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    countsCheck: check(
+      'roadmap_import_batches_counts_check',
+      sql`${table.rowCount} >= 0 AND ${table.goalCount} >= 0 AND ${table.milestoneCount} >= 0 AND ${table.taskCount} >= 0 AND ${table.skippedCount} >= 0 AND ${table.errorCount} >= 0`
+    ),
+    userCreatedIdx: index('roadmap_import_batches_user_created_idx').on(
+      table.userId,
+      table.createdAt
+    ),
+    userHashIdx: index('roadmap_import_batches_user_hash_idx').on(
+      table.userId,
+      table.contentHash
+    ),
+  })
+);
+
+export const roadmapGoals = pgTable(
+  'roadmap_goals',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    domain: text('domain').notNull().default('other'),
+    priority: text('priority').notNull().default('medium'),
+    status: text('status').notNull().default('active'),
+    startDate: text('start_date'),
+    dueDate: text('due_date'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    source: text('source').notNull().default('manual'),
+    importBatchId: uuid('import_batch_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    titleCheck: check(
+      'roadmap_goals_title_check',
+      sql`char_length(${table.title}) BETWEEN 1 AND 200`
+    ),
+    descriptionCheck: check(
+      'roadmap_goals_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 4000`
+    ),
+    domainCheck: check(
+      'roadmap_goals_domain_check',
+      sql`${table.domain} IN ('faith', 'personal', 'wealth', 'relationships', 'work', 'learning', 'other')`
+    ),
+    priorityCheck: check(
+      'roadmap_goals_priority_check',
+      sql`${table.priority} IN ('low', 'medium', 'high')`
+    ),
+    statusCheck: check(
+      'roadmap_goals_status_check',
+      sql`${table.status} IN ('active', 'done', 'paused')`
+    ),
+    sourceCheck: check(
+      'roadmap_goals_source_check',
+      sql`${table.source} IN ('csv', 'ai', 'manual')`
+    ),
+    datesCheck: check(
+      'roadmap_goals_dates_check',
+      sql`(${table.startDate} IS NULL OR ${table.startDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') AND (${table.dueDate} IS NULL OR ${table.dueDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')`
+    ),
+    userBatchFk: foreignKey({
+      name: 'roadmap_goals_user_batch_fk',
+      columns: [table.userId, table.importBatchId],
+      foreignColumns: [roadmapImportBatches.userId, roadmapImportBatches.id],
+    }).onDelete('cascade'),
+    userStatusDueIdx: index('roadmap_goals_user_status_due_idx').on(
+      table.userId,
+      table.status,
+      table.dueDate
+    ),
+  })
+);
+
+export const roadmapMilestones = pgTable(
+  'roadmap_milestones',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    goalId: uuid('goal_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    domain: text('domain').notNull().default('other'),
+    priority: text('priority').notNull().default('medium'),
+    status: text('status').notNull().default('active'),
+    startDate: text('start_date'),
+    dueDate: text('due_date'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    source: text('source').notNull().default('manual'),
+    importBatchId: uuid('import_batch_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    userGoalIdUnique: unique('roadmap_milestones_user_goal_id_unique').on(
+      table.userId,
+      table.goalId,
+      table.id
+    ),
+    titleCheck: check(
+      'roadmap_milestones_title_check',
+      sql`char_length(${table.title}) BETWEEN 1 AND 200`
+    ),
+    descriptionCheck: check(
+      'roadmap_milestones_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 4000`
+    ),
+    domainCheck: check(
+      'roadmap_milestones_domain_check',
+      sql`${table.domain} IN ('faith', 'personal', 'wealth', 'relationships', 'work', 'learning', 'other')`
+    ),
+    priorityCheck: check(
+      'roadmap_milestones_priority_check',
+      sql`${table.priority} IN ('low', 'medium', 'high')`
+    ),
+    statusCheck: check(
+      'roadmap_milestones_status_check',
+      sql`${table.status} IN ('active', 'done', 'paused')`
+    ),
+    sourceCheck: check(
+      'roadmap_milestones_source_check',
+      sql`${table.source} IN ('csv', 'ai', 'manual')`
+    ),
+    datesCheck: check(
+      'roadmap_milestones_dates_check',
+      sql`(${table.startDate} IS NULL OR ${table.startDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') AND (${table.dueDate} IS NULL OR ${table.dueDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')`
+    ),
+    userGoalFk: foreignKey({
+      name: 'roadmap_milestones_user_goal_fk',
+      columns: [table.userId, table.goalId],
+      foreignColumns: [roadmapGoals.userId, roadmapGoals.id],
+    }).onDelete('cascade'),
+    userBatchFk: foreignKey({
+      name: 'roadmap_milestones_user_batch_fk',
+      columns: [table.userId, table.importBatchId],
+      foreignColumns: [roadmapImportBatches.userId, roadmapImportBatches.id],
+    }).onDelete('cascade'),
+    userGoalStatusDueIdx: index('roadmap_milestones_user_goal_status_due_idx').on(
+      table.userId,
+      table.goalId,
+      table.status,
+      table.dueDate
+    ),
+  })
+);
+
+export const roadmapTasks = pgTable(
+  'roadmap_tasks',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    goalId: uuid('goal_id'),
+    milestoneId: uuid('milestone_id'),
+    title: text('title').notNull(),
+    description: text('description'),
+    domain: text('domain').notNull().default('other'),
+    priority: text('priority').notNull().default('medium'),
+    status: text('status').notNull().default('todo'),
+    startDate: text('start_date'),
+    dueDate: text('due_date'),
+    estimateMinutes: integer('estimate_minutes'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    source: text('source').notNull().default('manual'),
+    importBatchId: uuid('import_batch_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    titleCheck: check(
+      'roadmap_tasks_title_check',
+      sql`char_length(${table.title}) BETWEEN 1 AND 200`
+    ),
+    descriptionCheck: check(
+      'roadmap_tasks_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 4000`
+    ),
+    domainCheck: check(
+      'roadmap_tasks_domain_check',
+      sql`${table.domain} IN ('faith', 'personal', 'wealth', 'relationships', 'work', 'learning', 'other')`
+    ),
+    priorityCheck: check(
+      'roadmap_tasks_priority_check',
+      sql`${table.priority} IN ('low', 'medium', 'high')`
+    ),
+    statusCheck: check(
+      'roadmap_tasks_status_check',
+      sql`${table.status} IN ('todo', 'done', 'skipped', 'suggested')`
+    ),
+    sourceCheck: check(
+      'roadmap_tasks_source_check',
+      sql`${table.source} IN ('csv', 'ai', 'manual')`
+    ),
+    datesCheck: check(
+      'roadmap_tasks_dates_check',
+      sql`(${table.startDate} IS NULL OR ${table.startDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') AND (${table.dueDate} IS NULL OR ${table.dueDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')`
+    ),
+    estimateCheck: check(
+      'roadmap_tasks_estimate_check',
+      sql`${table.estimateMinutes} IS NULL OR ${table.estimateMinutes} > 0`
+    ),
+    userGoalFk: foreignKey({
+      name: 'roadmap_tasks_user_goal_fk',
+      columns: [table.userId, table.goalId],
+      foreignColumns: [roadmapGoals.userId, roadmapGoals.id],
+    }).onDelete('cascade'),
+    userMilestoneFk: foreignKey({
+      name: 'roadmap_tasks_user_milestone_fk',
+      columns: [table.userId, table.milestoneId],
+      foreignColumns: [roadmapMilestones.userId, roadmapMilestones.id],
+    }).onDelete('cascade'),
+    userGoalMilestoneFk: foreignKey({
+      name: 'roadmap_tasks_user_goal_milestone_fk',
+      columns: [table.userId, table.goalId, table.milestoneId],
+      foreignColumns: [roadmapMilestones.userId, roadmapMilestones.goalId, roadmapMilestones.id],
+    }).onDelete('cascade'),
+    userBatchFk: foreignKey({
+      name: 'roadmap_tasks_user_batch_fk',
+      columns: [table.userId, table.importBatchId],
+      foreignColumns: [roadmapImportBatches.userId, roadmapImportBatches.id],
+    }).onDelete('cascade'),
+    userStatusDueIdx: index('roadmap_tasks_user_status_due_idx').on(
+      table.userId,
+      table.status,
+      table.dueDate
+    ),
+    userGoalIdx: index('roadmap_tasks_user_goal_idx').on(table.userId, table.goalId),
+    userMilestoneIdx: index('roadmap_tasks_user_milestone_idx').on(
+      table.userId,
+      table.milestoneId
+    ),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -621,3 +890,11 @@ export type FaithVocabWord = typeof faithVocabBank.$inferSelect;
 export type NewFaithVocabWord = typeof faithVocabBank.$inferInsert;
 export type FaithSetting = typeof faithSettings.$inferSelect;
 export type NewFaithSetting = typeof faithSettings.$inferInsert;
+export type RoadmapImportBatch = typeof roadmapImportBatches.$inferSelect;
+export type NewRoadmapImportBatch = typeof roadmapImportBatches.$inferInsert;
+export type RoadmapGoal = typeof roadmapGoals.$inferSelect;
+export type NewRoadmapGoal = typeof roadmapGoals.$inferInsert;
+export type RoadmapMilestone = typeof roadmapMilestones.$inferSelect;
+export type NewRoadmapMilestone = typeof roadmapMilestones.$inferInsert;
+export type RoadmapTask = typeof roadmapTasks.$inferSelect;
+export type NewRoadmapTask = typeof roadmapTasks.$inferInsert;

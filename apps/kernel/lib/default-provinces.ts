@@ -25,7 +25,7 @@ export const DEFAULT_PROVINCES = [
   {
     name: 'Roadmap',
     slug: 'roadmap',
-    url: 'https://life-os-chi-ecru.vercel.app',
+    url: '/roadmap',
     weight: 0.15,
   },
   {
