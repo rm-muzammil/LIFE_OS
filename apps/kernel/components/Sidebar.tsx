@@ -12,6 +12,7 @@ import {
   BookOpen,
   Building2,
   Dumbbell,
+  Flag,
   Wallet,
   UsersRound,
   Briefcase,
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: '/hadith', label: 'Hadith', icon: BookOpen },
   { href: '/faith', label: 'Faith', icon: Moon },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
+  { href: '/roadmap', label: 'Roadmap', icon: Flag },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/relationships', label: 'Relationships', icon: UsersRound },
   { href: '/work', label: 'Work', icon: Briefcase },
@@ -96,6 +98,7 @@ export default function Sidebar() {
             pathname === href ||
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
             (href === '/personal' && pathname.startsWith('/personal/')) ||
+            (href === '/roadmap' && pathname.startsWith('/roadmap/')) ||
             (href === '/relationships' && pathname.startsWith('/relationships/')) ||
             (href === '/work' && pathname.startsWith('/work/'));
           const isFaithActive = href === '/faith' && pathname.startsWith('/faith/');

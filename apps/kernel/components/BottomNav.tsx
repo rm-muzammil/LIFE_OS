@@ -10,6 +10,7 @@ import {
   NotebookPen,
   Building2,
   Dumbbell,
+  Flag,
   Wallet,
   UsersRound,
   Briefcase,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: '/review', label: 'Review', icon: NotebookPen },
   { href: '/faith', label: 'Faith', icon: Moon },
   { href: '/personal', label: 'Personal', icon: Dumbbell },
+  { href: '/roadmap', label: 'Roadmap', icon: Flag },
   { href: '/wealth', label: 'Wealth', icon: Wallet },
   { href: '/relationships', label: 'Relationships', icon: UsersRound },
   { href: '/work', label: 'Work', icon: Briefcase },
@@ -46,6 +48,7 @@ export default function BottomNav() {
             pathname === href ||
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
             (href === '/personal' && pathname.startsWith('/personal/')) ||
+            (href === '/roadmap' && pathname.startsWith('/roadmap/')) ||
             (href === '/relationships' && pathname.startsWith('/relationships/')) ||
             (href === '/work' && pathname.startsWith('/work/'));
           const isFaithActive = href === '/faith' && pathname.startsWith('/faith/');
