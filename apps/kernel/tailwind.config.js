@@ -24,7 +24,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        arabic: ['var(--font-arabic)', 'serif'],
+        arabic: ['var(--font-amiri)', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',
