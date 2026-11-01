@@ -1,0 +1,67 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getApiUserId } from '@/lib/auth';
+import { parseUpload, confirmImport } from '@/lib/roadmap/import';
+import { MAX_CSV_BYTES } from '@/lib/roadmap/csv';
+import { isUuid } from '@/lib/roadmap/repo';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: NextRequest) {
+  const userId = await getApiUserId();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > MAX_CSV_BYTES + 16_384) {
+    return NextResponse.json({ error: 'CSV upload exceeds the 1 MB limit' }, { status: 413 });
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return NextResponse.json({ error: 'A multipart CSV upload is required' }, { status: 400 });
+  }
+  const file = form.get('file');
+  const batchId = form.get('batchId');
+  const expectedHash = form.get('contentHash');
+  if (!(file instanceof File)) return NextResponse.json({ error: 'A CSV file is required' }, { status: 400 });
+  if (file.size > MAX_CSV_BYTES) {
+    return NextResponse.json({ error: 'CSV file exceeds the 1 MB limit' }, { status: 413 });
+  }
+  if (!isUuid(batchId) || typeof expectedHash !== 'string' || !/^[0-9a-f]{64}$/.test(expectedHash)) {
+    return NextResponse.json({ error: 'A valid preview batchId and contentHash are required' }, { status: 400 });
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let parsed: ReturnType<typeof parseUpload>;
+  try {
+    parsed = parseUpload(bytes, file.name);
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'CSV could not be confirmed',
+    }, { status: 400 });
+  }
+  if (parsed.contentHash !== expectedHash) {
+    return NextResponse.json({ error: 'Uploaded file does not match the previewed file' }, { status: 409 });
+  }
+
+  try {
+    const result = await confirmImport(
+      userId,
+      batchId,
+      expectedHash,
+      bytes,
+      file.name
+    );
+    if (result.kind === 'conflict') {
+      return NextResponse.json({
+        error: 'This import batch has already been confirmed or is being processed',
+        status: result.status,
+      }, { status: 409 });
+    }
+    return NextResponse.json({ batchId, ...result.counts });
+  } catch {
+    return NextResponse.json({
+      error: 'Import failed after starting. Delete the failed batch before retrying.',
+    }, { status: 500 });
+  }
+}
