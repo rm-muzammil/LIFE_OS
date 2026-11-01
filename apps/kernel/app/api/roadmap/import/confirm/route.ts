@@ -3,6 +3,7 @@ import { getApiUserId } from '@/lib/auth';
 import { parseUpload, confirmImport } from '@/lib/roadmap/import';
 import { MAX_CSV_BYTES } from '@/lib/roadmap/csv';
 import { isUuid } from '@/lib/roadmap/repo';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
         status: result.status,
       }, { status: 409 });
     }
+    await refreshRoadmapProvinceScore(userId);
     return NextResponse.json({ batchId, ...result.counts });
   } catch {
     return NextResponse.json({

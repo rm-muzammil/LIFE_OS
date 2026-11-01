@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
 import { createGoal, isRecord, listGoals } from '@/lib/roadmap/repo';
 import { parseGoalInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,5 +31,6 @@ export async function POST(request: NextRequest) {
     startDate: input.startDate ?? null,
     dueDate: input.dueDate ?? null,
   });
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ goal }, { status: 201 });
 }

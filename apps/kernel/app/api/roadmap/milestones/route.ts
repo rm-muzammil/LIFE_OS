@@ -8,6 +8,7 @@ import {
   listMilestones,
 } from '@/lib/roadmap/repo';
 import { parseMilestoneInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest) {
     startDate: input.startDate ?? null,
     dueDate: input.dueDate ?? null,
   });
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ milestone }, { status: 201 });
 }

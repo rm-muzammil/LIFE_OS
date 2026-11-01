@@ -10,6 +10,7 @@ import {
   updateMilestone,
 } from '@/lib/roadmap/repo';
 import { parseMilestoneInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'goal not found' }, { status: 404 });
   }
   const milestone = await updateMilestone(userId, params.id, input);
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ milestone });
 }
 
@@ -57,5 +59,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ confirmRequired: true, counts });
   }
   await deleteMilestone(userId, params.id);
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ deleted: true, counts });
 }

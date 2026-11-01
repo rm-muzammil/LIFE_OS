@@ -7,6 +7,7 @@ import {
   isRecord,
   isUuid,
 } from '@/lib/roadmap/repo';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,5 +40,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   if (!deleted) {
     return NextResponse.json({ error: 'Cannot delete a batch while its import is running' }, { status: 409 });
   }
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ deleted: true, counts });
 }

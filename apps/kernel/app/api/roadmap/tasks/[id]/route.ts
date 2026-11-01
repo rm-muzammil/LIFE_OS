@@ -9,6 +9,7 @@ import {
   updateTask,
 } from '@/lib/roadmap/repo';
 import { parseTaskInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       ? { goalId: parents.goalId, milestoneId: parents.milestoneId }
       : {}),
   });
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ task });
 }
 
@@ -66,5 +68,6 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   if (!isUuid(params.id)) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
   const deleted = await deleteTask(userId, params.id);
   if (!deleted) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ deleted: true });
 }

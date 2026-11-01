@@ -9,6 +9,7 @@ import {
   updateGoal,
 } from '@/lib/roadmap/repo';
 import { parseGoalInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const rangeError = validateDateRange(startDate, dueDate);
   if (rangeError) return NextResponse.json({ error: rangeError }, { status: 400 });
   const goal = await updateGoal(userId, params.id, input);
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ goal });
 }
 
@@ -59,5 +61,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ confirmRequired: true, counts });
   }
   await deleteGoal(userId, params.id);
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ deleted: true, counts });
 }

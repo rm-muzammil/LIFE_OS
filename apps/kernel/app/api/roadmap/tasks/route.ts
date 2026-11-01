@@ -9,6 +9,7 @@ import {
   createTask,
 } from '@/lib/roadmap/repo';
 import { parseTaskInput, validateDateRange } from '@/lib/roadmap/validation';
+import { refreshRoadmapProvinceScore } from '@/lib/roadmap/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,5 +77,6 @@ export async function POST(request: NextRequest) {
     dueDate: input.dueDate ?? null,
     estimateMinutes: input.estimateMinutes ?? null,
   });
+  await refreshRoadmapProvinceScore(userId);
   return NextResponse.json({ task }, { status: 201 });
 }
