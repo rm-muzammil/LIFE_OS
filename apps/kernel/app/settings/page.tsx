@@ -57,9 +57,9 @@ export default function SettingsPage() {
     }
   }
 
-  const lastPull = provinces
-    .map((p) => p.lastPulledAt)
-    .filter(Boolean)
+  const lastRefresh = provinces
+    .map((p) => p.lastPulledAt ?? p.cachedAt)
+    .filter((timestamp): timestamp is string => timestamp !== null)
     .sort()
     .reverse()[0];
 
@@ -156,12 +156,12 @@ export default function SettingsPage() {
       </div>
 
       <div className="card p-6 space-y-3">
-        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide">Cron Status</h2>
+        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide">Province refresh status</h2>
         <p className="text-sm text-zinc-400">
-          Last pull run:{' '}
-          {lastPull ? (
+          Last refresh:{' '}
+          {lastRefresh ? (
             <span className="text-zinc-200">
-              {new Date(lastPull as string).toLocaleString('en-US', {
+              {new Date(lastRefresh).toLocaleString('en-US', {
                 timeZone: 'Asia/Karachi',
                 dateStyle: 'medium',
                 timeStyle: 'short',
@@ -172,7 +172,7 @@ export default function SettingsPage() {
           )}
         </p>
         <p className="text-xs text-zinc-600">
-          Derived from the most recent <code>lastPulledAt</code> across your provinces.
+          Based on the latest cached province score.
         </p>
       </div>
 

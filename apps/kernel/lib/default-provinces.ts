@@ -1,7 +1,6 @@
 import { db } from '@/db';
 import { provinces } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { generatePullSecret } from '@/lib/auth';
 
 export const DEFAULT_PROVINCES = [
   {
@@ -50,23 +49,16 @@ function buildRows(userId: string) {
     url: p.url,
     weight: p.weight,
     active: true,
-    // Push auth no longer checks this column — it now checks the single
-    // PROVINCE_SHARED_API_KEY env var (see /api/provinces/report). Kept
-    // as a literal marker rather than dropping the column, since it's
-    // NOT NULL and still populated by the older /api/provinces/register
-    // path for anyone adding a custom 7th province by hand.
-    apiKeyHash: 'shared',
-    // Pull auth (SK -> province app) is unchanged and still per-user —
-    // this keeps working exactly as before.
-    pullSecret: generatePullSecret(),
+    apiKeyHash: 'internal',
+    pullSecret: 'internal',
   }));
 }
 
 /**
  * Called from the signIn callback on every sign-in. Only creates the 6
  * default provinces the first time a user is seen (no provinces row yet) —
- * a no-op for everyone who already has provinces, whether auto- or
- * manually-registered. Never throws — a transient DB hiccup here should
+ * a no-op for everyone who already has province rows. Never throws — a
+ * transient DB hiccup here should
  * never block someone from actually signing in; they can always hit
  * "Reset to defaults" on /provinces afterward.
  */
@@ -90,7 +82,7 @@ export async function ensureDefaultProvinces(userId: string): Promise<void> {
 
 /**
  * Called from the "Reset to defaults" button — deletes every province this
- * user currently has (including any custom ones they registered by hand)
+ * user currently has (including existing custom rows)
  * and recreates exactly the 6 defaults. Historical province_daily_snapshots
  * rows are keyed by (userId, date, slug), not province id, so past life-score
  * history for faith/personal/wealth/roadmap/relationships/work survives a

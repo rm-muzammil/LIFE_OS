@@ -22,28 +22,12 @@ export async function GET(req: NextRequest) {
   const results = await Promise.allSettled(
     active.map(async (p) => {
       const computeInternalScore = INTERNAL_PROVINCES[p.slug];
-      let payload: Omit<ProvinceReportPayload, 'userId'>;
-
-      if (computeInternalScore) {
-        payload = await computeInternalScore(p.userId);
-      } else {
-        if (!p.url) throw new Error(`${p.slug} has no url configured`);
-
-        const res = await fetch(`${p.url.replace(/\/$/, '')}/api/report`, {
-          headers: {
-            Authorization: `Bearer ${p.pullSecret}`,
-            'X-User-Id': p.userId,
-          },
-          cache: 'no-store',
-        });
-
-        if (!res.ok) {
-          throw new Error(`${p.slug} responded ${res.status}`);
-        }
-
-        payload = (await res.json()) as ProvinceReportPayload;
+      if (!computeInternalScore) {
+        console.warn('pull-provinces: skipping unregistered province slug', p.slug);
+        return { slug: p.slug, skipped: true as const };
       }
 
+      const payload: Omit<ProvinceReportPayload, 'userId'> = await computeInternalScore(p.userId);
       const now = new Date();
       const details = {
         ...(payload.details ?? {}),
@@ -69,15 +53,24 @@ export async function GET(req: NextRequest) {
           set: { score: payload.score, details },
         });
 
-      return { slug: p.slug, score: payload.score };
+      return { slug: p.slug, score: payload.score, skipped: false as const };
     })
   );
 
-  const summary = results.map((r, i) => ({
-    slug: active[i].slug,
-    ok: r.status === 'fulfilled',
-    error: r.status === 'rejected' ? String(r.reason) : undefined,
-  }));
+  const summary = results.map((result, index) => {
+    if (result.status === 'rejected') {
+      return { slug: active[index].slug, ok: false, error: String(result.reason) };
+    }
+    if (result.value.skipped) {
+      return { slug: result.value.slug, ok: true, skipped: true };
+    }
+    return {
+      slug: result.value.slug,
+      ok: true,
+      skipped: false,
+      score: result.value.score,
+    };
+  });
 
   return NextResponse.json({ ranAt: new Date().toISOString(), summary });
 }

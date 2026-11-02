@@ -5,17 +5,12 @@ import { Flame, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import type { ProvinceWithMeta } from '@/lib/types';
 
 export default function ProvinceCard({ province }: { province: ProvinceWithMeta }) {
-  const neverPushed = province.cachedScore == null;
-  const lastUpdate =
-    province.slug === 'wealth' ? province.lastPulledAt : province.lastPushedAt;
+  const noScoreYet = province.cachedScore == null;
+  const lastRefresh = province.lastPulledAt ?? province.cachedAt;
   const name = province.url.startsWith('/') ? (
     <Link href={province.url} className="hover:text-brand-300">
       {province.name}
     </Link>
-  ) : province.url ? (
-    <a href={province.url} target="_blank" rel="noreferrer" className="hover:text-brand-300">
-      {province.name}
-    </a>
   ) : (
     province.name
   );
@@ -27,15 +22,15 @@ export default function ProvinceCard({ province }: { province: ProvinceWithMeta 
           <h3 className="font-semibold text-zinc-100">{name}</h3>
           <p className="text-xs text-zinc-600">weight {(province.weight * 100).toFixed(0)}%</p>
         </div>
-        {province.stale && !neverPushed && (
+        {province.stale && !noScoreYet && (
           <span className="flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-950/50 px-2 py-1 rounded-full">
             <AlertTriangle size={11} /> stale
           </span>
         )}
       </div>
 
-      {neverPushed ? (
-        <p className="text-sm text-zinc-600 italic py-2">Awaiting first score</p>
+      {noScoreYet ? (
+        <p className="text-sm text-zinc-600 italic py-2">Awaiting first refresh</p>
       ) : (
         <>
           <div className="flex items-end gap-1">
@@ -58,10 +53,10 @@ export default function ProvinceCard({ province }: { province: ProvinceWithMeta 
               {province.todayDone ? 'done today' : 'not yet'}
             </span>
           </div>
-          {lastUpdate && (
+          {lastRefresh && (
             <p className="text-[11px] text-zinc-700">
-              {province.slug === 'wealth' ? 'last update ' : 'last push '}
-              {new Date(lastUpdate).toLocaleString('en-US', {
+              last refreshed{' '}
+              {new Date(lastRefresh).toLocaleString('en-US', {
                 timeZone: 'Asia/Karachi',
                 month: 'short',
                 day: 'numeric',

@@ -85,34 +85,28 @@ export default function ProvincesPage() {
               <tr className="text-left text-zinc-500 border-b border-zinc-800">
                 <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Slug</th>
-                <th className="py-3 px-4">URL</th>
+                <th className="py-3 px-4">Internal path</th>
                 <th className="py-3 px-4">Weight</th>
                 <th className="py-3 px-4">Active</th>
-                <th className="py-3 px-4">Last Update</th>
+                <th className="py-3 px-4">Last refreshed</th>
                 <th className="py-3 px-4">Score</th>
                 <th className="py-3 px-4"></th>
               </tr>
             </thead>
             <tbody>
               {provinces.map((p) => {
-                const lastUpdate = p.slug === 'wealth' ? p.lastPulledAt : p.lastPushedAt;
+                const lastRefresh = p.lastPulledAt ?? p.cachedAt;
                 return (
                 <tr key={p.slug} className="border-b border-zinc-900">
                   <td className="py-3 px-4 font-medium">{p.name}</td>
                   <td className="py-3 px-4 text-zinc-500">{p.slug}</td>
                   <td className="py-3 px-4 text-zinc-500 max-w-[160px] truncate">
-                    {p.url ? (
-                      p.url.startsWith('/') ? (
-                        <Link href={p.url} className="hover:text-brand-400">
-                          {p.url}
-                        </Link>
-                      ) : (
-                        <a href={p.url} target="_blank" rel="noreferrer" className="hover:text-brand-400">
-                          {p.url.replace(/^https?:\/\//, '')}
-                        </a>
-                      )
+                    {p.url.startsWith('/') ? (
+                      <Link href={p.url} className="hover:text-brand-400">
+                        {p.url}
+                      </Link>
                     ) : (
-                      '—'
+                      p.url || '—'
                     )}
                   </td>
                   <td className="py-3 px-4">
@@ -141,8 +135,8 @@ export default function ProvincesPage() {
                     </button>
                   </td>
                   <td className="py-3 px-4 text-zinc-500 text-xs">
-                    {lastUpdate
-                      ? new Date(lastUpdate).toLocaleString('en-US', {
+                    {lastRefresh
+                      ? new Date(lastRefresh).toLocaleString('en-US', {
                           timeZone: 'Asia/Karachi',
                           month: 'short',
                           day: 'numeric',
