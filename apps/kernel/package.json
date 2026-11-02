@@ -14,7 +14,6 @@
   "dependencies": {
     "@life-os/db": "workspace:*",
     "@neondatabase/serverless": "^0.9.5",
-    "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",
@@ -28,7 +27,6 @@
     "recharts": "^2.12.7"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.14.15",
     "@types/react": "^18.3.3",

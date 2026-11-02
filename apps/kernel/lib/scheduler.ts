@@ -9,14 +9,12 @@ import type {
 
 // ─────────────────────────────────────────────────────────────
 // Province context — reads only from provinces.cachedDetails,
-// which is refreshed once/day by app/api/cron/pull-provinces.
+// refreshed daily by the internal province cron.
 // The scheduler never talks to province apps directly.
 //
-// If a province's cachedAt isn't from today (PKT), its pull hasn't
-// succeeded yet today — treat todayDone as false (unknown = assume
-// not done) rather than silently reusing yesterday's true/done flags.
-// This makes the prompt correct even if pull-provinces hasn't run yet
-// or failed, without requiring the two crons to fire in a guaranteed order.
+// If cachedAt isn't from today (PKT), treat todayDone as false rather
+// than silently reusing yesterday's true/done flags. This also handles
+// a missed refresh without requiring cron jobs to fire in a fixed order.
 // ─────────────────────────────────────────────────────────────
 export function buildProvinceContext(rows: Province[]): ProvinceContext[] {
   return rows.map((p) => {

@@ -60,9 +60,9 @@ export function isFromToday(date: string | Date | null): boolean {
   return dDatePKT === todayPKT();
 }
 
-export function isStale(lastPushedAt: string | Date | null, hours = 24): boolean {
-  if (!lastPushedAt) return true;
-  const last = typeof lastPushedAt === 'string' ? new Date(lastPushedAt) : lastPushedAt;
+export function isStale(lastRefreshedAt: string | Date | null, hours = 24): boolean {
+  if (!lastRefreshedAt) return true;
+  const last = typeof lastRefreshedAt === 'string' ? new Date(lastRefreshedAt) : lastRefreshedAt;
   const diffMs = Date.now() - last.getTime();
   return diffMs > hours * 60 * 60 * 1000;
 }

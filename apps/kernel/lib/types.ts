@@ -26,15 +26,6 @@ export interface ProvinceWithMeta {
   stale: boolean;
 }
 
-export const SEED_PROVINCES = [
-  { name: 'Faith', slug: 'faith', url: 'https://faithtracker.vercel.app', weight: 0.25 },
-  { name: 'Personal', slug: 'personal', url: 'https://personal-app.vercel.app', weight: 0.2 },
-  { name: 'Wealth', slug: 'wealth', url: 'https://wealth-app-eta.vercel.app', weight: 0.15 },
-  { name: 'Roadmap', slug: 'roadmap', url: 'https://life-os-chi-ecru.vercel.app', weight: 0.15 },
-  { name: 'Relationships', slug: 'relationships', url: '', weight: 0.1 },
-  { name: 'Work', slug: 'work', url: '', weight: 0.1 },
-] as const;
-
 // ─────────────────────────────────────────────────────────────
 // AI Scheduler + Chat
 // ─────────────────────────────────────────────────────────────
@@ -87,8 +78,7 @@ export interface ChatMessagePayload {
 }
 
 // Minimal per-province context handed to the Gemini prompt.
-// Built from provinces.cachedDetails (already pulled by the existing
-// pull-provinces cron) — the scheduler never talks to province apps directly.
+// Built from provinces.cachedDetails, refreshed by the internal province cron.
 export interface ProvinceContext {
   slug: string;
   name: string;
@@ -96,7 +86,6 @@ export interface ProvinceContext {
   todayDone: boolean;
   streak: number;
   details: Record<string, unknown>;
-  /** True if this province's cachedAt is not from today (PKT) — its last
-   *  successful pull was some earlier day, so today's status is unknown. */
+  /** True if this province's cachedAt is not from today (PKT). */
   stale: boolean;
 }

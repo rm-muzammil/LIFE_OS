@@ -5,6 +5,7 @@ import { eq, gte, and, desc } from 'drizzle-orm';
 import { todayPKT, nowPKT, isFromToday } from '@/lib/time';
 import { callGemini, getUserGeminiKeys, parseJsonResponse, GeminiError } from '@/lib/gemini';
 import { buildProvinceContext, extractPendingTaskHints, buildSchedulerPrompt } from '@/lib/scheduler';
+import { INTERNAL_PROVINCES } from '@/lib/internal-provinces';
 import { getApiUserId } from '@/lib/auth';
 import type { ScheduledTask, PrayerTimesConfig } from '@/lib/types';
 
@@ -84,13 +85,13 @@ export async function POST(req: NextRequest) {
       .from(provinces)
       .where(and(eq(provinces.userId, userId), eq(provinces.active, true)));
 
-    // Self-heal: if pull-provinces hasn't run yet today (or failed), pull now
-    // rather than trusting cron ordering — Vercel Hobby only guarantees the
-    // scheduled *hour*, not the minute, so we can't rely on pull-provinces
-    // having already run before this fires. This pulls for ALL users (the
-    // cron route already loops every active province across every user), not
+    // Self-heal: if a registered province is stale, refresh scores now rather
+    // than trusting cron ordering — Vercel Hobby only guarantees the scheduled
+    // *hour*, not the minute. The cron refreshes active provinces for ALL users, not
     // just this one — a little extra work, but keeps the self-heal simple.
-    const anyStale = provRows.some((p) => !isFromToday(p.cachedAt));
+    const anyStale = provRows.some(
+      (p) => INTERNAL_PROVINCES[p.slug] && !isFromToday(p.cachedAt)
+    );
     if (anyStale) {
       try {
         await fetch(`${req.nextUrl.origin}/api/cron/pull-provinces`, {

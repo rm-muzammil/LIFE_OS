@@ -1,6 +1,6 @@
 // Gemini 2.5 Flash — 3-key fallback chain.
 // Plain fetch (no SDK) to match the fetch-based pattern already used
-// for province pulls in app/api/cron/pull-provinces/route.ts.
+// for province refreshes in app/api/cron/pull-provinces/route.ts.
 
 import { db } from '@/db';
 import { userSettings } from '@/db/schema';

@@ -27,8 +27,8 @@ export const provinces = pgTable(
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     url: text('url').notNull(),
-    apiKeyHash: text('api_key_hash').notNull(), // bcrypt hash — verifies push
-    pullSecret: text('pull_secret').notNull(), // SK sends this when pulling
+    apiKeyHash: text('api_key_hash').notNull(), // Deprecated; retained for schema compatibility.
+    pullSecret: text('pull_secret').notNull(), // Deprecated; retained for schema compatibility.
     weight: real('weight').notNull().default(0),
     active: boolean('active').notNull().default(true),
     cachedScore: real('cached_score'), // last known 0-100
