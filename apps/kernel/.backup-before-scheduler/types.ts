@@ -24,12 +24,3 @@ export interface ProvinceWithMeta {
   todayDone?: boolean;
   stale: boolean;
 }
-
-export const SEED_PROVINCES = [
-  { name: 'Faith', slug: 'faith', url: 'https://faithtracker.vercel.app', weight: 0.25 },
-  { name: 'Personal', slug: 'personal', url: 'https://personal-app.vercel.app', weight: 0.2 },
-  { name: 'Wealth', slug: 'wealth', url: 'https://wealth-app-eta.vercel.app', weight: 0.15 },
-  { name: 'Roadmap', slug: 'roadmap', url: 'https://life-os-chi-ecru.vercel.app', weight: 0.15 },
-  { name: 'Relationships', slug: 'relationships', url: '', weight: 0.1 },
-  { name: 'Work', slug: 'work', url: '', weight: 0.1 },
-] as const;
