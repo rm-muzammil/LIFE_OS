@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/pull-provinces",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
