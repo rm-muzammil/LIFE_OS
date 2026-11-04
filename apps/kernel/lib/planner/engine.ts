@@ -6,12 +6,7 @@ const LAST_PLANNING_MINUTE = 1439;
 
 export type PlannerSessionKind = 'roadmap' | 'track' | 'flexible';
 export type PlanMode = 'full' | 'from-now';
-export type DroppedReason =
-  | 'no-gap'
-  | 'overbooked'
-  | 'quota-capped'
-  | 'below-minimum'
-  | 'invalid-window';
+export type DroppedReason = 'no-gap' | 'daily-cap' | 'overbooked';
 
 export interface PlannerEngineSettings {
   wakeTime: string;
@@ -20,7 +15,9 @@ export interface PlannerEngineSettings {
   minSessionMinutes: number;
   slackPercent: number;
   defaultTaskMinutes: number;
+  preferredSessionMinutes: number;
   weekStart: number;
+  stretchEnabled: boolean;
 }
 
 export interface RoadmapTaskCandidate {
@@ -61,6 +58,7 @@ export interface PlannedSession {
   plannedMinutes: number;
   roadmapTaskId?: string;
   trackId?: string;
+  extra?: true;
 }
 
 export interface DroppedPlanItem {
@@ -108,6 +106,17 @@ interface CandidateState {
   roadmapTaskId?: string;
   trackId?: string;
   preferredWindow?: PreferredWindow;
+  extra?: true;
+}
+
+export interface TrackQuotaDay {
+  remainingMinutes: number;
+  sessionSize: number;
+  sessionsNeeded: number;
+  remainingAllowedDays: number;
+  sessionsToday: number;
+  sessionMinutesToday: number[];
+  dailyCapMinutes: number;
 }
 
 function compareText(first: string, second: string): number {
@@ -131,34 +140,136 @@ function weekdayIsAllowed(track: TrackCandidate, weekday: number): boolean {
   return (track.allowedWeekdays & (1 << weekday)) !== 0;
 }
 
+function getAllowedDaysRemaining(
+  date: string,
+  weekStart: number,
+  track: TrackCandidate
+): number[] {
+  if (!Number.isInteger(weekStart) || weekStart < 0 || weekStart > 6) {
+    throw new RangeError('Week start must be a weekday from 0 to 6');
+  }
+  const weekday = weekdayForDate(date);
+  const offset = (weekday - weekStart + 7) % 7;
+  const remainingCalendarDays = 7 - offset;
+  const allowed: number[] = [];
+  for (let day = 0; day < remainingCalendarDays; day += 1) {
+    const candidateWeekday = (weekday + day) % 7;
+    if (weekdayIsAllowed(track, candidateWeekday)) allowed.push(candidateWeekday);
+  }
+  return allowed;
+}
+
+function balanceSessionMinutes(remainingMinutes: number, sessionsNeeded: number): number[] {
+  if (sessionsNeeded < 1) return [];
+  const base = Math.floor(remainingMinutes / sessionsNeeded);
+  const remainder = remainingMinutes % sessionsNeeded;
+  return Array.from({ length: sessionsNeeded }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+export function getTrackSessionSizes(
+  remainingMinutes: number,
+  sessionsNeeded: number,
+  minSessionMinutes: number,
+  maxSessionMinutes: number
+): number[] {
+  return mergeSubminimumRemainders(
+    balanceSessionMinutes(remainingMinutes, sessionsNeeded),
+    minSessionMinutes,
+    maxSessionMinutes
+  );
+}
+
+export function spreadSessionsAcrossAllowedDays(
+  sessionsNeeded: number,
+  remainingAllowedDays: number
+): number[] {
+  if (sessionsNeeded <= 0 || remainingAllowedDays <= 0) {
+    return Array.from({ length: Math.max(0, remainingAllowedDays) }, () => 0);
+  }
+  if (sessionsNeeded > remainingAllowedDays) {
+    return Array.from(
+      { length: remainingAllowedDays },
+      () => Math.ceil(sessionsNeeded / remainingAllowedDays)
+    );
+  }
+  return Array.from({ length: remainingAllowedDays }, (_, index) =>
+    Math.floor(((index + 1) * sessionsNeeded) / remainingAllowedDays) -
+    Math.floor((index * sessionsNeeded) / remainingAllowedDays)
+  );
+}
+
+function mergeSubminimumRemainders(
+  sessionMinutes: number[],
+  minSessionMinutes: number,
+  maxSessionMinutes: number
+): number[] {
+  const merged: number[] = [];
+  for (const minutes of sessionMinutes) {
+    if (
+      minutes < minSessionMinutes &&
+      merged.length > 0 &&
+      merged[merged.length - 1] + minutes <= maxSessionMinutes
+    ) {
+      merged[merged.length - 1] += minutes;
+    } else {
+      merged.push(minutes);
+    }
+  }
+  return merged.filter((minutes) => minutes >= minSessionMinutes);
+}
+
 export function getTrackDailyQuota(params: {
   date: string;
   weekStart: number;
+  preferredSessionMinutes: number;
   track: TrackCandidate;
   minutesDone: number;
-}): { remainingMinutes: number; remainingAllowedDays: number; targetMinutes: number; cappedMinutes: number } {
-  if (!Number.isInteger(params.weekStart) || params.weekStart < 0 || params.weekStart > 6) {
-    throw new RangeError('Week start must be a weekday from 0 to 6');
-  }
-  const weekday = weekdayForDate(params.date);
-  const offset = (weekday - params.weekStart + 7) % 7;
-  const remainingDaysInWeek = 7 - offset;
-  let remainingAllowedDays = 0;
-  for (let day = 0; day < remainingDaysInWeek; day += 1) {
-    if (weekdayIsAllowed(params.track, (weekday + day) % 7)) remainingAllowedDays += 1;
-  }
+}): TrackQuotaDay {
   const remainingMinutes = Math.max(
     0,
     params.track.weeklyTargetMinutes - Math.max(0, params.minutesDone)
   );
-  const targetMinutes = remainingAllowedDays === 0
-    ? 0
-    : Math.ceil(remainingMinutes / remainingAllowedDays);
+  const sessionSize = Math.min(
+    params.track.maxSessionMinutes,
+    Math.max(params.track.minSessionMinutes, params.preferredSessionMinutes)
+  );
+  const sessionsNeeded = remainingMinutes > 0 ? Math.ceil(remainingMinutes / sessionSize) : 0;
+  const allowedDays = getAllowedDaysRemaining(params.date, params.weekStart, params.track);
+  const dayIndex = allowedDays.indexOf(weekdayForDate(params.date));
+  let sessionsToday = 0;
+  if (dayIndex >= 0 && allowedDays.length > 0 && sessionsNeeded > 0) {
+    sessionsToday = spreadSessionsAcrossAllowedDays(
+      sessionsNeeded,
+      allowedDays.length
+    )[dayIndex] ?? 0;
+  }
+
+  const balanced = getTrackSessionSizes(
+    remainingMinutes,
+    sessionsNeeded,
+    params.track.minSessionMinutes,
+    params.track.maxSessionMinutes
+  );
+  const selected = balanced.slice(0, sessionsToday);
+  let dailyCapMinutes = 0;
+  let total = 0;
+  const sessionMinutesToday: number[] = [];
+  for (const minutes of selected) {
+    if (total + minutes > params.track.maxPerDayMinutes) {
+      dailyCapMinutes += minutes;
+      continue;
+    }
+    sessionMinutesToday.push(minutes);
+    total += minutes;
+  }
   return {
     remainingMinutes,
-    remainingAllowedDays,
-    targetMinutes,
-    cappedMinutes: Math.min(targetMinutes, params.track.maxPerDayMinutes),
+    sessionSize,
+    sessionsNeeded,
+    remainingAllowedDays: allowedDays.length,
+    sessionsToday,
+    sessionMinutesToday,
+    dailyCapMinutes,
   };
 }
 
@@ -185,14 +296,17 @@ function availableSlots(
   budgetRemaining: number,
   preferredRange: { start: number; end: number } | null
 ): Array<{ gap: MutableGap; start: number; available: number }> {
-  const slots = gaps.flatMap((gap) => {
-    const start = Math.max(gap.cursorMinute + (gap.hasSession ? breakMinutes : 0), preferredRange?.start ?? 0);
-    const end = Math.min(gap.endMinute, preferredRange?.end ?? 1440);
-    const available = Math.min(end - start - breakMinutes, budgetRemaining - breakMinutes);
+  return gaps.flatMap((gap) => {
+    const start = Math.max(
+      gap.cursorMinute + (gap.hasSession ? breakMinutes : 0),
+      preferredRange?.start ?? 0
+    );
+    const end = Math.min(gap.endMinute, preferredRange?.end ?? LAST_PLANNING_MINUTE);
+    const available = Math.min(end - start, budgetRemaining);
     return available > 0 ? [{ gap, start, available }] : [];
-  });
-  return slots.sort((first, second) => first.start - second.start ||
-    first.gap.endMinute - second.gap.endMinute);
+  }).sort((first, second) =>
+    first.start - second.start || first.gap.endMinute - second.gap.endMinute
+  );
 }
 
 function addDropped(
@@ -227,59 +341,78 @@ function createCandidateState(params: {
   roadmapTaskId?: string;
   trackId?: string;
   preferredWindow?: PreferredWindow;
+  extra?: true;
 }): CandidateState {
   return { ...params, remainingMinutes: params.minutes };
-}
-
-function createTrackTurnList(tracks: CandidateState[]): CandidateState[] {
-  return tracks.flatMap((track) => Array.from(
-    { length: track.priority },
-    () => track
-  ));
 }
 
 function trackWeight(priority: PlannerPriority): number {
   return priority === 'high' ? 3 : priority === 'medium' ? 2 : 1;
 }
 
+function createTrackTurnList(tracks: CandidateState[]): string[] {
+  const byTrack = new Map<string, CandidateState>();
+  for (const track of tracks) {
+    if (track.trackId && !byTrack.has(track.trackId)) byTrack.set(track.trackId, track);
+  }
+  return [...byTrack.entries()].flatMap(([trackId, track]) =>
+    Array.from({ length: track.priority }, () => trackId)
+  );
+}
+
 function pickTrackTurn(
-  turns: CandidateState[],
+  turns: string[],
   cursor: number,
   active: CandidateState[],
   previousTrackId: string | null
 ): { candidate: CandidateState | null; nextCursor: number } {
   if (active.length === 0 || turns.length === 0) return { candidate: null, nextCursor: cursor };
+  const activeTrackIds = new Set(active.map((candidate) => candidate.trackId));
   for (let step = 0; step < turns.length; step += 1) {
     const index = (cursor + step) % turns.length;
-    const turn = turns[index];
+    const trackId = turns[index];
     if (
-      active.includes(turn) &&
-      (turn.trackId !== previousTrackId || active.length === 1)
+      activeTrackIds.has(trackId) &&
+      (trackId !== previousTrackId || activeTrackIds.size === 1)
     ) {
-      return { candidate: turn, nextCursor: (index + 1) % turns.length };
+      return {
+        candidate: active.find((candidate) => candidate.trackId === trackId) ?? null,
+        nextCursor: (index + 1) % turns.length,
+      };
     }
   }
-  const index = turns.findIndex((turn) => active.includes(turn));
+  const index = turns.findIndex((trackId) => activeTrackIds.has(trackId));
   return index < 0
     ? { candidate: null, nextCursor: cursor }
-    : { candidate: turns[index], nextCursor: (index + 1) % turns.length };
+    : {
+        candidate: active.find((candidate) => candidate.trackId === turns[index]) ?? null,
+        nextCursor: (index + 1) % turns.length,
+      };
+}
+
+function droppedReason(
+  candidate: CandidateState,
+  budgetRemaining: number,
+  minSessionMinutes: number
+): DroppedReason {
+  if (budgetRemaining < minSessionMinutes) return 'overbooked';
+  return 'no-gap';
 }
 
 export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult {
   const wakeMinute = parseTimeToMinutes(input.settings.wakeTime);
   const sleepMinute = parseTimeToMinutes(input.settings.sleepTime);
-  const invalidWindow = wakeMinute === null || sleepMinute === null;
   const sessions: PlannedSession[] = [];
   const dropped: DroppedPlanItem[] = [];
-  const candidates: CandidateState[] = [];
-  const addCandidate = (candidate: CandidateState) => {
-    if (candidate.remainingMinutes > 0) candidates.push(candidate);
-  };
+  if (wakeMinute === null || sleepMinute === null) {
+    return { sessions, dropped, freeMinutes: 0, schedulableMinutes: 0 };
+  }
 
+  const candidates: CandidateState[] = [];
   for (const task of input.roadmapTasks
     .filter((candidate) => candidate.dueDate <= input.date)
     .sort(compareTasks)) {
-    addCandidate(createCandidateState({
+    candidates.push(createCandidateState({
       id: `roadmap-${task.id}`,
       title: task.title,
       description: 'Roadmap task',
@@ -291,9 +424,8 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
       roadmapTaskId: task.id,
     }));
   }
-
   for (const item of [...(input.flexibleItems ?? [])].sort(compareFlexible)) {
-    addCandidate(createCandidateState({
+    candidates.push(createCandidateState({
       id: `flexible-${item.id}`,
       title: item.title,
       description: item.description,
@@ -306,47 +438,44 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
   }
 
   const weekday = weekdayForDate(input.date);
-  const trackCandidates: CandidateState[] = [];
-  for (const track of [...input.tracks].sort((a, b) =>
-    compareText(a.title, b.title) || compareText(a.id, b.id)
-  )) {
-    if (!weekdayIsAllowed(track, weekday)) continue;
+  const eligibleTracks = input.tracks
+    .filter((track) => weekdayIsAllowed(track, weekday))
+    .sort((first, second) =>
+      compareText(first.title, second.title) || compareText(first.id, second.id)
+    );
+  const quotaSessions: CandidateState[] = [];
+  const quotaDrops: DroppedPlanItem[] = [];
+  for (const track of eligibleTracks) {
     const quota = getTrackDailyQuota({
       date: input.date,
       weekStart: input.settings.weekStart,
+      preferredSessionMinutes: input.settings.preferredSessionMinutes,
       track,
       minutesDone: input.trackMinutesDone[track.id] ?? 0,
     });
-    if (quota.targetMinutes > quota.cappedMinutes) {
-      dropped.push({
-        id: `track-${track.id}`,
-        title: track.title,
-        kind: 'track',
-        reason: 'quota-capped',
-        remainingMinutes: quota.targetMinutes - quota.cappedMinutes,
-      });
-    }
-    if (quota.cappedMinutes > 0) {
-      const state = createCandidateState({
-        id: `track-${track.id}`,
+    quota.sessionMinutesToday.forEach((minutes, index) => {
+      quotaSessions.push(createCandidateState({
+        id: `track-${track.id}-quota-${index + 1}`,
         title: track.title,
         description: 'Learning track',
         kind: 'track',
-        minutes: quota.cappedMinutes,
+        minutes,
         minSessionMinutes: track.minSessionMinutes,
         maxSessionMinutes: track.maxSessionMinutes,
         priority: trackWeight(track.priority),
         trackId: track.id,
         preferredWindow: track.preferredWindow,
+      }));
+    });
+    if (quota.dailyCapMinutes > 0) {
+      quotaDrops.push({
+        id: `track-${track.id}`,
+        title: track.title,
+        kind: 'track',
+        reason: 'daily-cap',
+        remainingMinutes: quota.dailyCapMinutes,
       });
-      trackCandidates.push(state);
-      addCandidate(state);
     }
-  }
-
-  if (invalidWindow) {
-    for (const candidate of candidates) addDropped(dropped, candidate, 'invalid-window');
-    return { sessions, dropped, freeMinutes: 0, schedulableMinutes: 0 };
   }
 
   const planStart = Math.max(wakeMinute, Math.min(LAST_PLANNING_MINUTE, Math.max(0, input.nowMinute)));
@@ -355,11 +484,7 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
     planStart,
     LAST_PLANNING_MINUTE
   );
-
-  const freeMinutes = freeGaps.reduce(
-    (total, gap) => total + gap.minutes,
-    0
-  );
+  const freeMinutes = freeGaps.reduce((total, gap) => total + gap.minutes, 0);
   const schedulableMinutes = Math.floor(
     freeMinutes * (100 - input.settings.slackPercent) / 100
   );
@@ -371,8 +496,10 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
   }));
   let budgetRemaining = schedulableMinutes;
   let sessionNumber = 0;
+  const trackMinutesToday = new Map<string, number>();
 
   const placeCandidate = (candidate: CandidateState): boolean => {
+    if (candidate.remainingMinutes < candidate.minSessionMinutes) return false;
     const preferred = candidate.kind === 'track' && candidate.preferredWindow
       ? preferredWindowRange(candidate.preferredWindow, wakeMinute, sleepMinute)
       : null;
@@ -380,15 +507,16 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
     if (preferred && !slots.some((slot) => slot.available >= candidate.minSessionMinutes)) {
       slots = availableSlots(gaps, input.settings.breakMinutes, budgetRemaining, null);
     }
-    const slot = slots.find((value) => value.available >= candidate.minSessionMinutes);
+    const slot = slots.find((value) =>
+      value.available >= candidate.minSessionMinutes &&
+      Math.min(value.available, candidate.maxSessionMinutes, candidate.remainingMinutes) >= candidate.minSessionMinutes
+    );
     if (!slot) return false;
-    const minutes = Math.min(
+    const plannedMinutes = Math.min(
       slot.available,
       candidate.maxSessionMinutes,
       candidate.remainingMinutes
     );
-    if (minutes < candidate.minSessionMinutes) return false;
-    const plannedMinutes = minutes;
     const endMinute = slot.start + plannedMinutes;
     sessionNumber += 1;
     sessions.push({
@@ -401,59 +529,93 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
       plannedMinutes,
       ...(candidate.roadmapTaskId ? { roadmapTaskId: candidate.roadmapTaskId } : {}),
       ...(candidate.trackId ? { trackId: candidate.trackId } : {}),
+      ...(candidate.extra ? { extra: true as const } : {}),
     });
     slot.gap.cursorMinute = endMinute;
     slot.gap.hasSession = true;
     candidate.remainingMinutes -= plannedMinutes;
-    budgetRemaining -= plannedMinutes + input.settings.breakMinutes;
+    budgetRemaining -= plannedMinutes;
+    if (candidate.trackId) {
+      trackMinutesToday.set(
+        candidate.trackId,
+        (trackMinutesToday.get(candidate.trackId) ?? 0) + plannedMinutes
+      );
+    }
     return true;
   };
 
-  const taskAndFlexible = candidates.filter((candidate) => candidate.kind !== 'track');
-  for (const candidate of taskAndFlexible) {
+  for (const candidate of candidates) {
     while (candidate.remainingMinutes >= candidate.minSessionMinutes) {
       if (!placeCandidate(candidate)) break;
     }
     if (candidate.remainingMinutes > 0) {
-      addDropped(
-        dropped,
-        candidate,
-        candidate.remainingMinutes < candidate.minSessionMinutes
-          ? 'below-minimum'
-          : budgetRemaining < candidate.minSessionMinutes + input.settings.breakMinutes
-            ? 'overbooked'
-            : 'no-gap'
-      );
+      addDropped(dropped, candidate, droppedReason(candidate, budgetRemaining, candidate.minSessionMinutes));
     }
   }
 
-  const activeTracks = trackCandidates.filter((candidate) => candidate.remainingMinutes > 0);
-  const turns = createTrackTurnList(trackCandidates);
-  let turnCursor = 0;
+  const trackTurns = createTrackTurnList(quotaSessions);
+  const activeQuotaSessions = [...quotaSessions];
+  let quotaCursor = 0;
   let previousTrackId: string | null = null;
-  while (activeTracks.length > 0) {
-    const turn = pickTrackTurn(turns, turnCursor, activeTracks, previousTrackId);
-    turnCursor = turn.nextCursor;
-    if (!turn.candidate) break;
-    const candidate = turn.candidate;
-    const before = candidate.remainingMinutes;
+  while (activeQuotaSessions.length > 0) {
+    const picked = pickTrackTurn(trackTurns, quotaCursor, activeQuotaSessions, previousTrackId);
+    quotaCursor = picked.nextCursor;
+    if (!picked.candidate) break;
+    const candidate = picked.candidate;
     if (placeCandidate(candidate)) {
       previousTrackId = candidate.trackId ?? null;
       if (candidate.remainingMinutes <= 0) {
-        activeTracks.splice(activeTracks.indexOf(candidate), 1);
+        activeQuotaSessions.splice(activeQuotaSessions.indexOf(candidate), 1);
       }
     } else {
-      candidate.remainingMinutes = before;
-      addDropped(
-        dropped,
-        candidate,
-        candidate.remainingMinutes < candidate.minSessionMinutes
-          ? 'below-minimum'
-          : budgetRemaining < candidate.minSessionMinutes + input.settings.breakMinutes
-            ? 'overbooked'
-            : 'no-gap'
+      addDropped(dropped, candidate, droppedReason(candidate, budgetRemaining, candidate.minSessionMinutes));
+      activeQuotaSessions.splice(activeQuotaSessions.indexOf(candidate), 1);
+    }
+  }
+  dropped.push(...quotaDrops);
+
+  if (input.settings.stretchEnabled && budgetRemaining >= input.settings.minSessionMinutes) {
+    const stretchCandidates = eligibleTracks.flatMap((track) => {
+      const alreadyPlanned = trackMinutesToday.get(track.id) ?? 0;
+      const remainingDayCapacity = track.maxPerDayMinutes - alreadyPlanned;
+      const maxSession = Math.min(
+        track.maxSessionMinutes,
+        input.settings.preferredSessionMinutes,
+        remainingDayCapacity
       );
-      activeTracks.splice(activeTracks.indexOf(candidate), 1);
+      return remainingDayCapacity >= track.minSessionMinutes && maxSession >= track.minSessionMinutes
+        ? [createCandidateState({
+            id: `track-${track.id}-extra`,
+            title: track.title,
+            description: 'Optional extra learning session',
+            kind: 'track',
+            minutes: remainingDayCapacity,
+            minSessionMinutes: track.minSessionMinutes,
+            maxSessionMinutes: maxSession,
+            priority: trackWeight(track.priority),
+            trackId: track.id,
+            preferredWindow: track.preferredWindow,
+            extra: true,
+          })]
+        : [];
+    });
+    const turns = createTrackTurnList(stretchCandidates);
+    const active = [...stretchCandidates];
+    let cursor = 0;
+    previousTrackId = null;
+    while (active.length > 0 && budgetRemaining >= input.settings.minSessionMinutes) {
+      const picked = pickTrackTurn(turns, cursor, active, previousTrackId);
+      cursor = picked.nextCursor;
+      if (!picked.candidate) break;
+      const candidate = picked.candidate;
+      if (placeCandidate(candidate)) {
+        previousTrackId = candidate.trackId ?? null;
+        if (candidate.remainingMinutes < candidate.minSessionMinutes) {
+          active.splice(active.indexOf(candidate), 1);
+        }
+      } else {
+        active.splice(active.indexOf(candidate), 1);
+      }
     }
   }
 

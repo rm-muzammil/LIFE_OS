@@ -53,6 +53,8 @@ export type PlannerCommitmentInput = {
   date: string | null;
   startTime: string;
   endTime: string;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
   validFrom: string | null;
   validTo: string | null;
   location: string | null;

@@ -39,6 +39,8 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   weekStart: 1,
   slackPercent: 15,
   defaultTaskMinutes: 30,
+  preferredSessionMinutes: 45,
+  stretchEnabled: false,
 };
 
 export interface PrayerTimes {

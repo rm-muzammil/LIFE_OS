@@ -31,6 +31,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     date: existing.date,
     startTime: existing.startTime,
     endTime: existing.endTime,
+    bufferBeforeMinutes: existing.bufferBeforeMinutes,
+    bufferAfterMinutes: existing.bufferAfterMinutes,
     validFrom: existing.validFrom,
     validTo: existing.validTo,
     location: existing.location,

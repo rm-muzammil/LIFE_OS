@@ -854,6 +854,8 @@ export const plannerSettings = pgTable('planner_settings', {
   weekStart: smallint('week_start').notNull().default(1),
   slackPercent: smallint('slack_percent').notNull().default(15),
   defaultTaskMinutes: integer('default_task_minutes').notNull().default(30),
+  preferredSessionMinutes: integer('preferred_session_minutes').notNull().default(45),
+  stretchEnabled: boolean('stretch_enabled').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   wakeTimeCheck: check(
@@ -904,6 +906,10 @@ export const plannerSettings = pgTable('planner_settings', {
     'planner_settings_default_task_minutes_check',
     sql`${table.defaultTaskMinutes} BETWEEN 5 AND 240`
   ),
+  preferredSessionMinutesCheck: check(
+    'planner_settings_preferred_session_minutes_check',
+    sql`${table.preferredSessionMinutes} BETWEEN 10 AND 240`
+  ),
 }));
 
 export const plannerCommitments = pgTable(
@@ -917,6 +923,8 @@ export const plannerCommitments = pgTable(
     date: text('date'),
     startTime: text('start_time').notNull(),
     endTime: text('end_time').notNull(),
+    bufferBeforeMinutes: smallint('buffer_before_minutes').notNull().default(0),
+    bufferAfterMinutes: smallint('buffer_after_minutes').notNull().default(0),
     validFrom: text('valid_from'),
     validTo: text('valid_to'),
     location: text('location'),
@@ -946,6 +954,14 @@ export const plannerCommitments = pgTable(
     endTimeCheck: check(
       'planner_commitments_end_time_check',
       sql`${table.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${table.endTime} > ${table.startTime}`
+    ),
+    bufferBeforeMinutesCheck: check(
+      'planner_commitments_buffer_before_minutes_check',
+      sql`${table.bufferBeforeMinutes} BETWEEN 0 AND 180`
+    ),
+    bufferAfterMinutesCheck: check(
+      'planner_commitments_buffer_after_minutes_check',
+      sql`${table.bufferAfterMinutes} BETWEEN 0 AND 180`
     ),
     dateRangeCheck: check(
       'planner_commitments_date_range_check',

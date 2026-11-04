@@ -46,6 +46,8 @@ function commitment(
     date: null,
     startTime: '11:40',
     endTime: '12:10',
+    bufferBeforeMinutes: 0,
+    bufferAfterMinutes: 0,
     validFrom: null,
     validTo: null,
     location: null,

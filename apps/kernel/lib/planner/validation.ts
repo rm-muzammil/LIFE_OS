@@ -26,6 +26,8 @@ export interface PlannerSettingsInput {
   weekStart: number;
   slackPercent: number;
   defaultTaskMinutes: number;
+  preferredSessionMinutes: number;
+  stretchEnabled: boolean;
 }
 
 export interface CommitmentInput {
@@ -35,6 +37,8 @@ export interface CommitmentInput {
   date: string | null;
   startTime: string;
   endTime: string;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
   validFrom: string | null;
   validTo: string | null;
   location: string | null;
@@ -152,6 +156,7 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
     'jumuahBlockMinutes', 'breakMinutes', 'minSessionMinutes', 'prayerAuto',
     'prayerCity', 'prayerCountry', 'prayerMethod', 'prayerAsrSchool',
     'engineEnabled', 'weekStart', 'slackPercent', 'defaultTaskMinutes',
+    'preferredSessionMinutes', 'stretchEnabled',
   ];
   if (!fields.some((field) => body[field] !== undefined)) {
     return invalid('At least one planner setting is required');
@@ -195,6 +200,13 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
       const parsed = parseInteger(raw, field, 5, 240);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
+    } else if (field === 'preferredSessionMinutes') {
+      const parsed = parseInteger(raw, field, 10, 240);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'stretchEnabled') {
+      if (typeof raw !== 'boolean') return invalid('stretchEnabled must be a boolean');
+      value.stretchEnabled = raw;
     } else if (field === 'engineEnabled') {
       if (typeof raw !== 'boolean') return invalid('engineEnabled must be a boolean');
       value.engineEnabled = raw;
@@ -231,6 +243,8 @@ export function mergeAndValidateSettings(
     weekStart: current?.weekStart ?? DEFAULT_PLANNER_SETTINGS.weekStart,
     slackPercent: current?.slackPercent ?? DEFAULT_PLANNER_SETTINGS.slackPercent,
     defaultTaskMinutes: current?.defaultTaskMinutes ?? DEFAULT_PLANNER_SETTINGS.defaultTaskMinutes,
+    preferredSessionMinutes: current?.preferredSessionMinutes ?? DEFAULT_PLANNER_SETTINGS.preferredSessionMinutes,
+    stretchEnabled: current?.stretchEnabled ?? DEFAULT_PLANNER_SETTINGS.stretchEnabled,
     ...partial,
   };
   if (parseTimeToMinutes(merged.wakeTime) === parseTimeToMinutes(merged.sleepTime)) {
@@ -286,6 +300,13 @@ export function parseCommitmentInput(
     const parsed = parseTime(body.endTime, 'endTime');
     if (!parsed.ok) return parsed;
     value.endTime = parsed.value;
+  }
+  for (const field of ['bufferBeforeMinutes', 'bufferAfterMinutes'] as const) {
+    if (!partial || body[field] !== undefined) {
+      const parsed = parseInteger(body[field] ?? 0, field, 0, 180);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    }
   }
   for (const field of ['validFrom', 'validTo'] as const) {
     if (!partial || body[field] !== undefined) {

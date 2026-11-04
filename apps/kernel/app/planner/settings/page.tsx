@@ -54,6 +54,8 @@ export default function PlannerSettingsPage() {
           prayerCountry: settings.prayerCountry,
           prayerMethod: settings.prayerMethod,
           prayerAsrSchool: settings.prayerAsrSchool,
+          preferredSessionMinutes: settings.preferredSessionMinutes,
+          stretchEnabled: settings.stretchEnabled,
         }),
       });
       setSettings(response.settings);
@@ -74,7 +76,7 @@ export default function PlannerSettingsPage() {
           <section className="card space-y-4 p-5">
             <div>
               <h2 className="text-base font-semibold text-zinc-100">Day boundaries</h2>
-              <p className="mt-1 text-xs text-zinc-500">Times are interpreted as Asia/Karachi wall-clock times.</p>
+              <p className="mt-1 text-xs text-zinc-500">Times are interpreted as Asia/Karachi wall-clock times. Planning ends at midnight.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
@@ -128,12 +130,20 @@ export default function PlannerSettingsPage() {
           <section className="card space-y-4 p-5">
             <div>
               <h2 className="text-base font-semibold text-zinc-100">Planning preferences</h2>
-              <p className="mt-1 text-xs text-zinc-500">Used by later planning phases; no tasks are scheduled in this phase.</p>
+              <p className="mt-1 text-xs text-zinc-500">Controls session lengths, breaks, and optional stretch sessions.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberInput label="Break between sessions (minutes)" value={settings.breakMinutes} min={0} max={180} onChange={(value) => update('breakMinutes', value)} />
               <NumberInput label="Minimum learning session (minutes)" value={settings.minSessionMinutes} min={1} max={1440} onChange={(value) => update('minSessionMinutes', value)} />
+              <NumberInput label="Preferred track session (minutes)" value={settings.preferredSessionMinutes} min={10} max={240} onChange={(value) => update('preferredSessionMinutes', value)} />
             </div>
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+              <input className="mt-1" type="checkbox" checked={settings.stretchEnabled} onChange={(event) => update('stretchEnabled', event.target.checked)} />
+              <span>
+                <span className="block text-sm text-zinc-200">Stretch mode</span>
+                <span className="mt-1 block text-xs text-zinc-500">Offer remaining capacity as optional extra track sessions after due work and weekly quota sessions.</span>
+              </span>
+            </label>
           </section>
 
           <button type="submit" disabled={saving || loading} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto">

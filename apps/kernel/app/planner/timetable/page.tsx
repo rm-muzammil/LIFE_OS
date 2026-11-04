@@ -33,6 +33,8 @@ interface CommitmentForm {
   date: string;
   startTime: string;
   endTime: string;
+  bufferBeforeMinutes: string;
+  bufferAfterMinutes: string;
   validFrom: string;
   validTo: string;
   location: string;
@@ -47,6 +49,8 @@ const EMPTY_FORM: CommitmentForm = {
   date: '',
   startTime: '09:00',
   endTime: '10:00',
+  bufferBeforeMinutes: '0',
+  bufferAfterMinutes: '0',
   validFrom: '',
   validTo: '',
   location: '',
@@ -62,6 +66,8 @@ function toForm(commitment: PlannerCommitmentRow): CommitmentForm {
     date: commitment.date ?? '',
     startTime: commitment.startTime,
     endTime: commitment.endTime,
+    bufferBeforeMinutes: String(commitment.bufferBeforeMinutes),
+    bufferAfterMinutes: String(commitment.bufferAfterMinutes),
     validFrom: commitment.validFrom ?? '',
     validTo: commitment.validTo ?? '',
     location: commitment.location ?? '',
@@ -111,6 +117,8 @@ export default function PlannerTimetablePage() {
       date: form.scheduleType === 'date' ? form.date : null,
       startTime: form.startTime,
       endTime: form.endTime,
+      bufferBeforeMinutes: Number(form.bufferBeforeMinutes),
+      bufferAfterMinutes: Number(form.bufferAfterMinutes),
       validFrom: form.validFrom || null,
       validTo: form.validTo || null,
       location: form.location || null,
@@ -209,6 +217,14 @@ export default function PlannerTimetablePage() {
             <span className="label">End time</span>
             <input className="input" type="time" required value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} />
             <span className="mt-1 block text-[11px] text-amber-400/80">Commitments cannot cross midnight; split this into two entries at midnight.</span>
+          </label>
+          <label>
+            <span className="label">Travel before (minutes)</span>
+            <input className="input" type="number" min={0} max={180} value={form.bufferBeforeMinutes} onChange={(event) => setForm({ ...form, bufferBeforeMinutes: event.target.value })} />
+          </label>
+          <label>
+            <span className="label">Travel after (minutes)</span>
+            <input className="input" type="number" min={0} max={180} value={form.bufferAfterMinutes} onChange={(event) => setForm({ ...form, bufferAfterMinutes: event.target.value })} />
           </label>
           <label>
             <span className="label">Valid from (optional)</span>
