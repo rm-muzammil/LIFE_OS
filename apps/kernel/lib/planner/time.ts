@@ -46,3 +46,36 @@ export function weekdayForDate(date: string): number {
     32045;
   return (julianDay + 1) % 7;
 }
+
+export function addCalendarDays(date: string, offset: number): string {
+  if (!isPlannerDate(date) || !Number.isSafeInteger(offset) || Math.abs(offset) > 3660) {
+    throw new RangeError('Expected a valid date and a bounded whole-day offset');
+  }
+  let [year, month, day] = date.split('-').map(Number);
+  const direction = offset < 0 ? -1 : 1;
+  for (let remaining = Math.abs(offset); remaining > 0; remaining -= 1) {
+    day += direction;
+    if (direction > 0) {
+      const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      if (day > daysInMonth[month - 1]) {
+        day = 1;
+        month += 1;
+        if (month > 12) {
+          month = 1;
+          year += 1;
+        }
+      }
+    } else if (day < 1) {
+      month -= 1;
+      if (month < 1) {
+        month = 12;
+        year -= 1;
+      }
+      const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      day = daysInMonth[month - 1];
+    }
+  }
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}

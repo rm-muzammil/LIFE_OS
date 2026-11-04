@@ -51,14 +51,32 @@ function commitmentApplies(
   return commitment.date ? commitment.date === date : commitment.weekday === weekday;
 }
 
+export function commitmentsForDate(
+  date: string,
+  commitments: PlannerCommitmentRow[],
+  cancelledIds: ReadonlySet<string> = new Set<string>()
+) {
+  const weekday = weekdayForDate(date);
+  return commitments
+    .filter((commitment) => commitment.active)
+    .filter((commitment) => {
+      if (commitment.validFrom && date < commitment.validFrom) return false;
+      if (commitment.validTo && date > commitment.validTo) return false;
+      return commitment.date ? commitment.date === date : commitment.weekday === weekday;
+    })
+    .map((commitment) => ({
+      commitment,
+      cancelled: cancelledIds.has(commitment.id),
+    }));
+}
+
 function commitmentBlocks(
   date: string,
   commitments: PlannerCommitmentRow[],
   cancelledIds: ReadonlySet<string>
 ): PlannerBlock[] {
-  const weekday = weekdayForDate(date);
   return commitments.flatMap((commitment) => {
-    if (!commitmentApplies(commitment, date, weekday, cancelledIds)) return [];
+    if (!commitmentApplies(commitment, date, weekdayForDate(date), cancelledIds)) return [];
     const start = parseTimeToMinutes(commitment.startTime);
     const end = parseTimeToMinutes(commitment.endTime);
     if (start === null || end === null || end <= start) return [];
