@@ -836,6 +836,242 @@ export const roadmapTasks = pgTable(
   })
 );
 
+export const plannerSettings = pgTable('planner_settings', {
+  userId: text('user_id').primaryKey(),
+  wakeTime: text('wake_time').notNull().default('05:00'),
+  sleepTime: text('sleep_time').notNull().default('23:00'),
+  prayerBlockMinutes: integer('prayer_block_minutes').notNull().default(20),
+  prayerBufferBeforeMinutes: integer('prayer_buffer_before_minutes').notNull().default(10),
+  jumuahBlockMinutes: integer('jumuah_block_minutes').notNull().default(90),
+  breakMinutes: integer('break_minutes').notNull().default(5),
+  minSessionMinutes: integer('min_session_minutes').notNull().default(25),
+  prayerAuto: boolean('prayer_auto').notNull().default(false),
+  prayerCity: text('prayer_city'),
+  prayerCountry: text('prayer_country'),
+  prayerMethod: integer('prayer_method').notNull().default(1),
+  prayerAsrSchool: smallint('prayer_asr_school').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  wakeTimeCheck: check(
+    'planner_settings_wake_time_check',
+    sql`${table.wakeTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`
+  ),
+  sleepTimeCheck: check(
+    'planner_settings_sleep_time_check',
+    sql`${table.sleepTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`
+  ),
+  prayerBlockCheck: check(
+    'planner_settings_prayer_block_check',
+    sql`${table.prayerBlockMinutes} BETWEEN 1 AND 360`
+  ),
+  prayerBufferCheck: check(
+    'planner_settings_prayer_buffer_check',
+    sql`${table.prayerBufferBeforeMinutes} BETWEEN 0 AND 180`
+  ),
+  jumuahBlockCheck: check(
+    'planner_settings_jumuah_block_check',
+    sql`${table.jumuahBlockMinutes} BETWEEN 1 AND 360`
+  ),
+  breakCheck: check(
+    'planner_settings_break_check',
+    sql`${table.breakMinutes} BETWEEN 0 AND 180`
+  ),
+  minSessionCheck: check(
+    'planner_settings_min_session_check',
+    sql`${table.minSessionMinutes} BETWEEN 1 AND 1440`
+  ),
+  prayerMethodCheck: check(
+    'planner_settings_prayer_method_check',
+    sql`${table.prayerMethod} BETWEEN 0 AND 99`
+  ),
+  prayerAsrSchoolCheck: check(
+    'planner_settings_prayer_asr_school_check',
+    sql`${table.prayerAsrSchool} IN (0, 1)`
+  ),
+}));
+
+export const plannerCommitments = pgTable(
+  'planner_commitments',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    title: text('title').notNull(),
+    kind: text('kind').notNull(),
+    weekday: smallint('weekday'),
+    date: text('date'),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time').notNull(),
+    validFrom: text('valid_from'),
+    validTo: text('valid_to'),
+    location: text('location'),
+    notes: text('notes'),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    titleCheck: check(
+      'planner_commitments_title_check',
+      sql`char_length(${table.title}) BETWEEN 1 AND 120`
+    ),
+    kindCheck: check(
+      'planner_commitments_kind_check',
+      sql`${table.kind} IN ('lecture', 'work', 'other')`
+    ),
+    occurrenceCheck: check(
+      'planner_commitments_occurrence_check',
+      sql`(${table.weekday} IS NOT NULL AND ${table.weekday} BETWEEN 0 AND 6 AND ${table.date} IS NULL) OR (${table.weekday} IS NULL AND ${table.date} IS NOT NULL AND ${table.date} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')`
+    ),
+    startTimeCheck: check(
+      'planner_commitments_start_time_check',
+      sql`${table.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`
+    ),
+    endTimeCheck: check(
+      'planner_commitments_end_time_check',
+      sql`${table.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${table.endTime} > ${table.startTime}`
+    ),
+    dateRangeCheck: check(
+      'planner_commitments_date_range_check',
+      sql`(${table.validFrom} IS NULL OR ${table.validFrom} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') AND (${table.validTo} IS NULL OR ${table.validTo} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') AND (${table.validFrom} IS NULL OR ${table.validTo} IS NULL OR ${table.validFrom} <= ${table.validTo})`
+    ),
+    locationCheck: check(
+      'planner_commitments_location_check',
+      sql`${table.location} IS NULL OR char_length(${table.location}) <= 200`
+    ),
+    notesCheck: check(
+      'planner_commitments_notes_check',
+      sql`${table.notes} IS NULL OR char_length(${table.notes}) <= 2000`
+    ),
+    userWeekdayIdx: index('planner_commitments_user_weekday_idx').on(
+      table.userId,
+      table.active,
+      table.weekday,
+      table.startTime
+    ),
+    userDateIdx: index('planner_commitments_user_date_idx').on(
+      table.userId,
+      table.active,
+      table.date,
+      table.startTime
+    ),
+  })
+);
+
+export const plannerCommitmentExceptions = pgTable(
+  'planner_commitment_exceptions',
+  {
+    userId: text('user_id').notNull(),
+    commitmentId: uuid('commitment_id').notNull(),
+    date: text('date').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.commitmentId, table.date] }),
+    dateCheck: check(
+      'planner_commitment_exceptions_date_check',
+      sql`${table.date} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
+    ),
+    userDateIdx: index('planner_commitment_exceptions_user_date_idx').on(
+      table.userId,
+      table.date
+    ),
+    userCommitmentFk: foreignKey({
+      name: 'planner_commitment_exceptions_user_commitment_fk',
+      columns: [table.userId, table.commitmentId],
+      foreignColumns: [plannerCommitments.userId, plannerCommitments.id],
+    }).onDelete('cascade'),
+  })
+);
+
+export const plannerTracks = pgTable(
+  'planner_tracks',
+  {
+    id: uuid('id').notNull().defaultRandom(),
+    userId: text('user_id').notNull(),
+    title: text('title').notNull(),
+    domain: text('domain').notNull().default('learning'),
+    weeklyTargetMinutes: integer('weekly_target_minutes').notNull(),
+    minSessionMinutes: integer('min_session_minutes').notNull(),
+    maxSessionMinutes: integer('max_session_minutes').notNull(),
+    maxPerDayMinutes: integer('max_per_day_minutes').notNull(),
+    preferredWindow: text('preferred_window').notNull().default('any'),
+    allowedWeekdays: smallint('allowed_weekdays').notNull().default(127),
+    priority: text('priority').notNull().default('medium'),
+    active: boolean('active').notNull().default(true),
+    goalId: uuid('goal_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.id] }),
+    titleCheck: check(
+      'planner_tracks_title_check',
+      sql`char_length(${table.title}) BETWEEN 1 AND 100`
+    ),
+    domainCheck: check(
+      'planner_tracks_domain_check',
+      sql`${table.domain} IN ('faith', 'personal', 'wealth', 'relationships', 'work', 'learning', 'other')`
+    ),
+    weeklyTargetCheck: check(
+      'planner_tracks_weekly_target_check',
+      sql`${table.weeklyTargetMinutes} BETWEEN 0 AND 10080`
+    ),
+    sessionLimitsCheck: check(
+      'planner_tracks_session_limits_check',
+      sql`${table.minSessionMinutes} > 0 AND ${table.minSessionMinutes} <= ${table.maxSessionMinutes} AND ${table.maxSessionMinutes} <= ${table.maxPerDayMinutes}`
+    ),
+    preferredWindowCheck: check(
+      'planner_tracks_preferred_window_check',
+      sql`${table.preferredWindow} IN ('morning', 'afternoon', 'evening', 'night', 'any')`
+    ),
+    weekdaysCheck: check(
+      'planner_tracks_allowed_weekdays_check',
+      sql`${table.allowedWeekdays} BETWEEN 0 AND 127`
+    ),
+    priorityCheck: check(
+      'planner_tracks_priority_check',
+      sql`${table.priority} IN ('low', 'medium', 'high')`
+    ),
+    userActivePriorityIdx: index('planner_tracks_user_active_priority_idx').on(
+      table.userId,
+      table.active,
+      table.priority
+    ),
+    userGoalIdx: index('planner_tracks_user_goal_idx').on(table.userId, table.goalId),
+  })
+);
+
+export const plannerPrayerCache = pgTable(
+  'planner_prayer_cache',
+  {
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    fajr: text('fajr').notNull(),
+    dhuhr: text('dhuhr').notNull(),
+    asr: text('asr').notNull(),
+    maghrib: text('maghrib').notNull(),
+    isha: text('isha').notNull(),
+    source: text('source').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.date] }),
+    dateCheck: check(
+      'planner_prayer_cache_date_check',
+      sql`${table.date} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
+    ),
+    timesCheck: check(
+      'planner_prayer_cache_times_check',
+      sql`(${table.fajr} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${table.dhuhr} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${table.asr} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${table.maghrib} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${table.isha} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')`
+    ),
+    sourceCheck: check(
+      'planner_prayer_cache_source_check',
+      sql`${table.source} IN ('auto', 'manual', 'default')`
+    ),
+  })
+);
+
 export type Province = typeof provinces.$inferSelect;
 export type NewProvince = typeof provinces.$inferInsert;
 export type ProvinceDailySnapshot = typeof provinceDailySnapshots.$inferSelect;
@@ -898,3 +1134,10 @@ export type RoadmapMilestone = typeof roadmapMilestones.$inferSelect;
 export type NewRoadmapMilestone = typeof roadmapMilestones.$inferInsert;
 export type RoadmapTask = typeof roadmapTasks.$inferSelect;
 export type NewRoadmapTask = typeof roadmapTasks.$inferInsert;
+export type PlannerSettingsRow = typeof plannerSettings.$inferSelect;
+export type PlannerCommitment = typeof plannerCommitments.$inferSelect;
+export type NewPlannerCommitment = typeof plannerCommitments.$inferInsert;
+export type PlannerCommitmentException = typeof plannerCommitmentExceptions.$inferSelect;
+export type PlannerTrack = typeof plannerTracks.$inferSelect;
+export type NewPlannerTrack = typeof plannerTracks.$inferInsert;
+export type PlannerPrayerCacheRow = typeof plannerPrayerCache.$inferSelect;

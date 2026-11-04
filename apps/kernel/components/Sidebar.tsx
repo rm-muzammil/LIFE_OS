@@ -27,6 +27,7 @@ import clsx from 'clsx';
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/planner', label: 'Planner', icon: CalendarDays },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/life-score', label: 'Life Score', icon: TrendingUp },
   { href: '/character', label: 'Character', icon: Heart },
@@ -99,6 +100,7 @@ export default function Sidebar() {
             (href === '/wealth' && pathname.startsWith('/wealth/')) ||
             (href === '/personal' && pathname.startsWith('/personal/')) ||
             (href === '/roadmap' && pathname.startsWith('/roadmap/')) ||
+            (href === '/planner' && pathname.startsWith('/planner/')) ||
             (href === '/relationships' && pathname.startsWith('/relationships/')) ||
             (href === '/work' && pathname.startsWith('/work/'));
           const isFaithActive = href === '/faith' && pathname.startsWith('/faith/');
