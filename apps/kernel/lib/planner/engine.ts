@@ -484,10 +484,10 @@ export function getReplaceablePlannerEntryIds(
   nowMinute: number
 ): string[] {
   return entries.filter((entry) => {
-    if (entry.source !== 'planner' || entry.status !== 'pending' || entry.locked) return false;
+    if (entry.source !== 'planner' || entry.status !== 'pending') return false;
+    if (mode === 'from-now' && entry.locked) return false;
     const start = entry.startTime ? parseTimeToMinutes(entry.startTime) : null;
-    const isFuture = mode === 'from-now' ? start !== null && start >= nowMinute : start !== null && !(start < nowMinute);
-    return isFuture;
+    return start !== null && start >= nowMinute;
   }).map((entry) => entry.id);
 }
 

@@ -176,6 +176,11 @@ const replaceable = getReplaceablePlannerEntryIds([
   { id: 'future', status: 'pending', source: 'planner', startTime: '15:00' },
 ], 'from-now', 720);
 assert.deepEqual(replaceable, ['future']);
+assert.deepEqual(getReplaceablePlannerEntryIds([
+  { id: 'past', status: 'pending', source: 'planner', startTime: '11:00' },
+  { id: 'locked', status: 'pending', source: 'planner', startTime: '14:00', locked: true },
+  { id: 'future', status: 'pending', source: 'planner', startTime: '15:00' },
+], 'full', 720), ['locked', 'future']);
 console.log('PASS replanning from now preserves done, past, locked and non-planner entries');
 
 const deterministicInput = makeInput({
