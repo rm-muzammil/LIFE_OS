@@ -22,6 +22,10 @@ export interface PlannerSettingsInput {
   prayerCountry: string | null;
   prayerMethod: number;
   prayerAsrSchool: number;
+  engineEnabled: boolean;
+  weekStart: number;
+  slackPercent: number;
+  defaultTaskMinutes: number;
 }
 
 export interface CommitmentInput {
@@ -147,6 +151,7 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
     'wakeTime', 'sleepTime', 'prayerBlockMinutes', 'prayerBufferBeforeMinutes',
     'jumuahBlockMinutes', 'breakMinutes', 'minSessionMinutes', 'prayerAuto',
     'prayerCity', 'prayerCountry', 'prayerMethod', 'prayerAsrSchool',
+    'engineEnabled', 'weekStart', 'slackPercent', 'defaultTaskMinutes',
   ];
   if (!fields.some((field) => body[field] !== undefined)) {
     return invalid('At least one planner setting is required');
@@ -178,6 +183,21 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
       const parsed = parseInteger(raw, field, 0, 1);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
+    } else if (field === 'weekStart') {
+      const parsed = parseInteger(raw, field, 0, 6);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'slackPercent') {
+      const parsed = parseInteger(raw, field, 0, 50);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'defaultTaskMinutes') {
+      const parsed = parseInteger(raw, field, 5, 240);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'engineEnabled') {
+      if (typeof raw !== 'boolean') return invalid('engineEnabled must be a boolean');
+      value.engineEnabled = raw;
     } else if (field === 'prayerAuto') {
       if (typeof raw !== 'boolean') return invalid('prayerAuto must be a boolean');
       value.prayerAuto = raw;
@@ -207,6 +227,10 @@ export function mergeAndValidateSettings(
     prayerCountry: current?.prayerCountry ?? DEFAULT_PLANNER_SETTINGS.prayerCountry,
     prayerMethod: current?.prayerMethod ?? DEFAULT_PLANNER_SETTINGS.prayerMethod,
     prayerAsrSchool: current?.prayerAsrSchool ?? DEFAULT_PLANNER_SETTINGS.prayerAsrSchool,
+    engineEnabled: current?.engineEnabled ?? DEFAULT_PLANNER_SETTINGS.engineEnabled,
+    weekStart: current?.weekStart ?? DEFAULT_PLANNER_SETTINGS.weekStart,
+    slackPercent: current?.slackPercent ?? DEFAULT_PLANNER_SETTINGS.slackPercent,
+    defaultTaskMinutes: current?.defaultTaskMinutes ?? DEFAULT_PLANNER_SETTINGS.defaultTaskMinutes,
     ...partial,
   };
   if (parseTimeToMinutes(merged.wakeTime) === parseTimeToMinutes(merged.sleepTime)) {

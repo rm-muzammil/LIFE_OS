@@ -850,6 +850,10 @@ export const plannerSettings = pgTable('planner_settings', {
   prayerCountry: text('prayer_country'),
   prayerMethod: integer('prayer_method').notNull().default(1),
   prayerAsrSchool: smallint('prayer_asr_school').notNull().default(1),
+  engineEnabled: boolean('engine_enabled').notNull().default(false),
+  weekStart: smallint('week_start').notNull().default(1),
+  slackPercent: smallint('slack_percent').notNull().default(15),
+  defaultTaskMinutes: integer('default_task_minutes').notNull().default(30),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   wakeTimeCheck: check(
@@ -887,6 +891,18 @@ export const plannerSettings = pgTable('planner_settings', {
   prayerAsrSchoolCheck: check(
     'planner_settings_prayer_asr_school_check',
     sql`${table.prayerAsrSchool} IN (0, 1)`
+  ),
+  weekStartCheck: check(
+    'planner_settings_week_start_check',
+    sql`${table.weekStart} BETWEEN 0 AND 6`
+  ),
+  slackPercentCheck: check(
+    'planner_settings_slack_percent_check',
+    sql`${table.slackPercent} BETWEEN 0 AND 50`
+  ),
+  defaultTaskMinutesCheck: check(
+    'planner_settings_default_task_minutes_check',
+    sql`${table.defaultTaskMinutes} BETWEEN 5 AND 240`
   ),
 }));
 
