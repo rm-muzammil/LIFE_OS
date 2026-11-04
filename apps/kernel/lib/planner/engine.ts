@@ -1,5 +1,8 @@
 import type { PlannerBlock, PreferredWindow, PlannerPriority } from '@/lib/planner/types';
 import { parseTimeToMinutes, weekdayForDate } from '@/lib/planner/time';
+import { buildSleepBlocks, computeFreeGaps } from '@/lib/planner/blocks';
+
+const LAST_PLANNING_MINUTE = 1439;
 
 export type PlannerSessionKind = 'roadmap' | 'track' | 'flexible';
 export type PlanMode = 'full' | 'from-now';
@@ -164,15 +167,16 @@ function preferredWindowRange(
   wakeMinute: number,
   sleepMinute: number
 ): { start: number; end: number } | null {
+  const planningEnd = sleepMinute > wakeMinute ? sleepMinute : LAST_PLANNING_MINUTE;
   const ranges: Record<Exclude<PreferredWindow, 'any'>, [number, number]> = {
     morning: [wakeMinute, wakeMinute + 360],
     afternoon: [wakeMinute + 360, wakeMinute + 720],
     evening: [wakeMinute + 720, wakeMinute + 960],
-    night: [wakeMinute + 960, sleepMinute],
+    night: [wakeMinute + 960, planningEnd],
   };
   if (window === 'any') return null;
   const [start, end] = ranges[window];
-  return { start: Math.max(wakeMinute, start), end: Math.min(sleepMinute, end) };
+  return { start: Math.max(wakeMinute, start), end: Math.min(planningEnd, end) };
 }
 
 function availableSlots(
@@ -264,7 +268,7 @@ function pickTrackTurn(
 export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult {
   const wakeMinute = parseTimeToMinutes(input.settings.wakeTime);
   const sleepMinute = parseTimeToMinutes(input.settings.sleepTime);
-  const invalidWindow = wakeMinute === null || sleepMinute === null || sleepMinute <= wakeMinute;
+  const invalidWindow = wakeMinute === null || sleepMinute === null;
   const sessions: PlannedSession[] = [];
   const dropped: DroppedPlanItem[] = [];
   const candidates: CandidateState[] = [];
@@ -345,33 +349,23 @@ export function buildPlannerPlan(input: PlannerEngineInput): PlannerEngineResult
     return { sessions, dropped, freeMinutes: 0, schedulableMinutes: 0 };
   }
 
-  const planStart = Math.max(wakeMinute, Math.min(1440, Math.max(0, input.nowMinute)));
-  const gapsRaw = input.fixedBlocks
-    .map((block) => ({
-      startMinute: Math.max(planStart, block.startMinute),
-      endMinute: Math.min(sleepMinute, block.endMinute),
-    }))
-    .filter((block) => block.endMinute > block.startMinute)
-    .sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute);
-  const freeGaps: Array<{ startMinute: number; endMinute: number }> = [];
-  let gapCursor = planStart;
-  for (const block of gapsRaw) {
-    if (block.startMinute > gapCursor) {
-      freeGaps.push({ startMinute: gapCursor, endMinute: block.startMinute });
-    }
-    gapCursor = Math.max(gapCursor, block.endMinute);
-  }
-  if (gapCursor < sleepMinute) freeGaps.push({ startMinute: gapCursor, endMinute: sleepMinute });
+  const planStart = Math.max(wakeMinute, Math.min(LAST_PLANNING_MINUTE, Math.max(0, input.nowMinute)));
+  const freeGaps = computeFreeGaps(
+    [...input.fixedBlocks, ...buildSleepBlocks(input.settings)],
+    planStart,
+    LAST_PLANNING_MINUTE
+  );
 
   const freeMinutes = freeGaps.reduce(
-    (total, gap) => total + gap.endMinute - gap.startMinute,
+    (total, gap) => total + gap.minutes,
     0
   );
   const schedulableMinutes = Math.floor(
     freeMinutes * (100 - input.settings.slackPercent) / 100
   );
   const gaps: MutableGap[] = freeGaps.map((gap) => ({
-    ...gap,
+    startMinute: gap.startMinute,
+    endMinute: gap.endMinute,
     cursorMinute: gap.startMinute,
     hasSession: false,
   }));

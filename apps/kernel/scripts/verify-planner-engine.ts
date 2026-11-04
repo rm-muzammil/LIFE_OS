@@ -226,6 +226,31 @@ assert.ok(splitPlan.sessions.every((session) => session.plannedMinutes <= 40));
 assert.ok(splitPlan.dropped.some((item) => item.id === 'roadmap-split' && item.remainingMinutes === 10));
 console.log('PASS task longer than every gap is split and remaining work is reported');
 
+for (const fixture of [
+  { wakeTime: '08:00', sleepTime: '02:00', expectedStart: 480, label: '08:00 / 02:00' },
+  { wakeTime: '05:00', sleepTime: '00:30', expectedStart: 300, label: '05:00 / 00:30' },
+  { wakeTime: '05:00', sleepTime: '23:00', expectedStart: 300, label: '05:00 / 23:00' },
+]) {
+  const plan = buildPlannerPlan(makeInput({
+    nowMinute: fixture.expectedStart,
+    settings: { ...settings, wakeTime: fixture.wakeTime, sleepTime: fixture.sleepTime },
+    roadmapTasks: [{
+      id: 'fill-day',
+      title: 'Fill day',
+      dueDate: '2024-01-03',
+      estimateMinutes: 5000,
+      priority: 1,
+    }],
+  }));
+  assert.ok(plan.sessions.length > 0, `${fixture.label} schedules the awake day`);
+  assert.ok(plan.sessions.every((session) =>
+    minute(session.startTime) >= fixture.expectedStart &&
+    minute(session.endTime) <= (fixture.sleepTime > fixture.wakeTime ? minute(fixture.sleepTime) : 1439)
+  ), `${fixture.label} sessions remain inside the day and do not cross midnight`);
+  assert.ok(plan.sessions.every((session) => session.endTime !== '24:00'));
+}
+console.log('PASS overnight sleep windows: 08:00 / 02:00, 05:00 / 00:30, and 05:00 / 23:00');
+
 let plannerCalled = false;
 let legacyCalled = false;
 const selectedPath = dispatchGenerationMode({
