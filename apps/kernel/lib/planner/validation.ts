@@ -82,6 +82,19 @@ function parseText(
   return valid(text || null);
 }
 
+function parsePrayerLocation(value: unknown, field: 'prayerCity' | 'prayerCountry'): Validation<string | null> {
+  if (value === null || value === '') return valid(null);
+  if (typeof value !== 'string') return invalid(`${field} must be text or null`);
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) {
+    return invalid(`${field} must not contain control characters`);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length < 1 || trimmed.length > 100) {
+    return invalid(`${field} must be 1 to 100 characters`);
+  }
+  return valid(trimmed);
+}
+
 function parseInteger(
   value: unknown,
   field: string,
@@ -169,7 +182,7 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
       if (typeof raw !== 'boolean') return invalid('prayerAuto must be a boolean');
       value.prayerAuto = raw;
     } else {
-      const parsed = parseText(raw, field, 100, true);
+      const parsed = parsePrayerLocation(raw, field);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
     }
@@ -286,7 +299,9 @@ export function validateCommitment(input: CommitmentInput): string | null {
   if ((input.weekday === null) === (input.date === null)) {
     return 'Exactly one of weekday or date must be set';
   }
-  if (input.endTime <= input.startTime) return 'endTime must be later than startTime';
+  if (input.endTime <= input.startTime) {
+    return 'Commitments cannot cross midnight; split this into two entries at midnight';
+  }
   if (input.validFrom && input.validTo && input.validFrom > input.validTo) {
     return 'validFrom must not be after validTo';
   }

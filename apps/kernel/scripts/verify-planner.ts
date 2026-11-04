@@ -6,6 +6,11 @@ import {
 } from '@/lib/planner/blocks';
 import { resolvePrayerTimes } from '@/lib/planner/prayer';
 import {
+  parseCommitmentInput,
+  parseSettingsInput,
+  validateCommitment,
+} from '@/lib/planner/validation';
+import {
   DEFAULT_PLANNER_SETTINGS,
   type PlannerCommitmentRow,
   type PlannerSettings,
@@ -145,6 +150,39 @@ const defaultFallback = await resolvePrayerTimes({
 });
 assert.equal(defaultFallback.source, 'default', 'missing manual times fall back to defaults');
 assert.deepEqual(mockedNetworkCalls, ['aladhan', 'aladhan']);
+
+const staleManualCache = await resolvePrayerTimes({
+  settings: autoSettings,
+  cached: { times: manualPrayerTimes, source: 'manual' },
+  manual: null,
+}, async () => {
+  mockedNetworkCalls.push('aladhan');
+  return null;
+});
+assert.equal(staleManualCache.source, 'default', 'non-auto cached fallback is not reused');
+assert.deepEqual(mockedNetworkCalls, ['aladhan', 'aladhan', 'aladhan']);
+
+const cityWithWhitespace = parseSettingsInput({ prayerCity: '  Lahore  ' });
+assert.deepEqual(cityWithWhitespace, { ok: true, value: { prayerCity: 'Lahore' } });
+assert.equal(parseSettingsInput({ prayerCountry: '  ' }).ok, false, 'blank location is rejected');
+assert.equal(parseSettingsInput({ prayerCity: 'La\nhore' }).ok, false, 'control characters are rejected');
+assert.equal(parseSettingsInput({ prayerCity: `x${'a'.repeat(100)}` }).ok, false, 'overlong location is rejected');
+
+const crossingMidnight = parseCommitmentInput({
+  title: 'Night shift',
+  kind: 'work',
+  weekday: 1,
+  date: null,
+  startTime: '23:30',
+  endTime: '00:30',
+  validFrom: null,
+  validTo: null,
+  location: null,
+  notes: null,
+  active: true,
+});
+assert(crossingMidnight.ok);
+assert.match(validateCommitment(crossingMidnight.value as Parameters<typeof validateCommitment>[0]) ?? '', /split this into two entries at midnight/);
 
 console.log('Planner foundation verification passed: overlaps, cancellation, validity, Friday Dhuhr, gaps, sleep, and prayer fallback.');
 }

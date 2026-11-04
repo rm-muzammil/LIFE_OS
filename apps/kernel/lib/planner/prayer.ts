@@ -81,14 +81,6 @@ export async function resolvePrayerTimes(
   const manual = validCandidate(params.manual, 'manual');
   if (manual) return manual;
 
-  if (params.cached?.source === 'manual') {
-    const cachedManual = validCandidate(params.cached.times, 'manual');
-    if (cachedManual) return cachedManual;
-  }
-  if (params.cached?.source === 'default') {
-    const cachedDefault = validCandidate(params.cached.times, 'default');
-    if (cachedDefault) return cachedDefault;
-  }
   return { times: DEFAULT_PRAYER_TIMES, source: 'default' };
 }
 
@@ -184,10 +176,12 @@ export async function getPrayerTimes(userId: string, date: string): Promise<Pray
       manual,
     }, () => fetchAladhanTimes(date, settings));
 
-    try {
-      await cachePrayerTimes(userId, date, chosen.times, chosen.source);
-    } catch {
-      console.error('Planner prayer cache write failed');
+    if (chosen.source === 'auto') {
+      try {
+        await cachePrayerTimes(userId, date, chosen.times, 'auto');
+      } catch {
+        console.error('Planner prayer cache write failed');
+      }
     }
 
     return { ...chosen.times, source: chosen.source, isFriday: isFriday(date) };
