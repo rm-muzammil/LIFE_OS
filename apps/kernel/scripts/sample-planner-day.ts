@@ -8,11 +8,13 @@ const settings = {
   sleepTime: '23:00',
   breakMinutes: 5,
   minSessionMinutes: 25,
-  slackPercent: 15,
+  slackPercent: 0,
   defaultTaskMinutes: 30,
   preferredSessionMinutes: 45,
   weekStart: 1,
   stretchEnabled: false,
+  stretchCapPercent: 150,
+  maxDailyFocusMinutes: 300,
 };
 
 const tracks = [
@@ -23,47 +25,68 @@ const tracks = [
   { id: 'linkedin', title: 'LinkedIn', weeklyTargetMinutes: 60, minSessionMinutes: 25, maxSessionMinutes: 45, maxPerDayMinutes: 90, preferredWindow: 'any' as const, allowedWeekdays: 127, priority: 'low' as const },
 ];
 
-const tasks = [
-  { id: 'overdue-task', title: 'Finish overdue report', dueDate: '2024-01-01', estimateMinutes: 30, priority: 2 },
-  { id: 'due-task', title: 'Prepare project submission', dueDate: '2024-01-02', estimateMinutes: 60, priority: 1 },
-];
+const progress = {
+  docker: 120,
+  dsa: 200,
+  arabic: 40,
+  german: 38,
+  linkedin: 30,
+};
 
-function fixedPrayerBlocks(friday: boolean) {
-  return [
-    { title: 'Fajr', minute: 5 * 60 + 30, duration: 20 },
-    { title: 'Dhuhr', minute: 12 * 60 + 15, duration: friday ? 90 : 20 },
-    { title: 'Asr', minute: 15 * 60 + 30, duration: 20 },
-    { title: 'Maghrib', minute: 17 * 60 + 45, duration: 20 },
-    { title: 'Isha', minute: 19 * 60, duration: 20 },
-  ].map(({ title, minute, duration }, index) => ({
-    id: `prayer-${index}`,
-    title,
-    kind: 'prayer' as const,
-    startMinute: minute - 10,
-    endMinute: minute + duration,
-  }));
+type FixedBlock = PlannerEngineInput['fixedBlocks'][number];
+
+function block(id: string, title: string, startMinute: number, endMinute: number): FixedBlock {
+  return { id, title, kind: 'commitment', startMinute, endMinute };
 }
 
-function makeInput(date: string, lectures: boolean, friday: boolean, stretchEnabled: boolean): PlannerEngineInput {
-  const taskDueToday = { ...tasks[1], dueDate: date };
+const tuesdayBlocks = [
+  block('lecture-1-travel', 'Lecture 09:00-11:00 + travel', 8 * 60 + 30, 11 * 60 + 30),
+  block('lunch-tuesday', 'Lunch', 12 * 60, 12 * 60 + 45),
+  block('lecture-2-travel', 'Lecture 14:00-15:30 + travel', 13 * 60 + 30, 16 * 60),
+  block('dinner-tuesday', 'Dinner', 20 * 60, 20 * 60 + 45),
+];
+
+const saturdayBlocks = [
+  block('lunch-saturday', 'Lunch', 13 * 60 + 30, 14 * 60 + 15),
+  block('dinner-saturday', 'Dinner', 20 * 60, 20 * 60 + 45),
+];
+
+function makeInput(params: {
+  date: string;
+  blocks?: FixedBlock[];
+  stretchEnabled: boolean;
+  trackMinutesDone?: Readonly<Record<string, number>>;
+  maxDailyFocusMinutes?: number;
+  stretchCapPercent?: number;
+}): PlannerEngineInput {
   return {
-    date,
-    nowMinute: 300,
-    settings: { ...settings, stretchEnabled },
-    fixedBlocks: [
-      ...fixedPrayerBlocks(friday),
-      ...(lectures ? [
-        { id: 'lecture-1', title: 'Lecture', kind: 'commitment' as const, startMinute: 540, endMinute: 660 },
-        { id: 'lecture-2', title: 'Lecture', kind: 'commitment' as const, startMinute: 840, endMinute: 930 },
-      ] : []),
-    ],
-    roadmapTasks: [tasks[0], taskDueToday],
+    date: params.date,
+    nowMinute: 5 * 60,
+    settings: {
+      ...settings,
+      stretchEnabled: params.stretchEnabled,
+      maxDailyFocusMinutes: params.maxDailyFocusMinutes ?? settings.maxDailyFocusMinutes,
+      stretchCapPercent: params.stretchCapPercent ?? settings.stretchCapPercent,
+    },
+    fixedBlocks: params.blocks ?? [],
+    roadmapTasks: [],
     tracks,
-    trackMinutesDone: {},
+    trackMinutesDone: params.trackMinutesDone ?? {},
   };
 }
 
-function printPlan(label: string, input: PlannerEngineInput, printRemainders = false) {
+function remainingLabel(target: number, done: number, scheduled: number): string {
+  const remaining = target - done - scheduled;
+  if (remaining === 0) return 'met';
+  if (remaining < 0) return `+${Math.abs(remaining)} over target`;
+  return `${remaining} minutes`;
+}
+
+function printPlan(
+  label: string,
+  input: PlannerEngineInput,
+  printRemainders = false
+) {
   const result = buildPlannerPlan(input);
   const rows = result.sessions.map((session) => ({
     start: session.startTime,
@@ -84,6 +107,15 @@ function printPlan(label: string, input: PlannerEngineInput, printRemainders = f
     `| ${values.start.padEnd(widths.start)} | ${values.end.padEnd(widths.end)} | ${values.kind.padEnd(widths.kind)} | ${values.title.padEnd(widths.title)} | ${values.minutes.padStart(widths.minutes)} |`;
 
   console.log(`\n${label} — stretch ${input.settings.stretchEnabled ? 'on' : 'off'}`);
+  console.log(`Daily focus cap: ${input.settings.maxDailyFocusMinutes} minutes`);
+  console.log(`Per-track stretch cap: ${input.settings.stretchCapPercent}%`);
+  console.log('Protected blocks:');
+  if (input.fixedBlocks.length === 0) console.log('  (none)');
+  for (const fixed of input.fixedBlocks) {
+    const start = `${String(Math.floor(fixed.startMinute / 60)).padStart(2, '0')}:${String(fixed.startMinute % 60).padStart(2, '0')}`;
+    const end = `${String(Math.floor(fixed.endMinute / 60)).padStart(2, '0')}:${String(fixed.endMinute % 60).padStart(2, '0')}`;
+    console.log(`  - ${start}-${end} ${fixed.title}`);
+  }
   console.log(line);
   console.log(printRow({ start: 'start', end: 'end', kind: 'kind', title: 'title', minutes: 'minutes' }));
   console.log(line);
@@ -97,34 +129,49 @@ function printPlan(label: string, input: PlannerEngineInput, printRemainders = f
     }));
   }
   console.log(line);
+  console.log(`Total focus minutes per day: ${result.sessions.reduce((sum, session) => sum + session.plannedMinutes, 0)}`);
+  console.log('Warnings:');
+  if (result.warnings.length === 0) console.log('  (none)');
+  for (const warning of result.warnings) console.log(`  - ${warning}`);
   console.log('Dropped:');
   if (result.dropped.length === 0) console.log('  (none)');
   for (const item of result.dropped) {
     console.log(`  - ${item.title}: ${item.reason} (${item.remainingMinutes} minutes)`);
   }
   if (printRemainders) {
-    console.log('Track weekly minutes remaining after today’s scheduled sessions:');
+    console.log('Remaining weekly minutes after progress and today’s scheduled sessions:');
     for (const track of tracks) {
-      const planned = result.sessions
+      const scheduled = result.sessions
         .filter((session) => session.trackId === track.id)
         .reduce((total, session) => total + session.plannedMinutes, 0);
-      console.log(`  ${track.title}: ${Math.max(0, track.weeklyTargetMinutes - planned)}`);
+      console.log(`  ${track.title}: ${remainingLabel(
+        track.weeklyTargetMinutes,
+        input.trackMinutesDone[track.id] ?? 0,
+        scheduled
+      )}`);
     }
   }
 }
 
 for (const stretchEnabled of [false, true]) {
   printPlan(
-    'Tuesday 2024-01-02 (lectures 09:00-11:00, 14:00-15:30)',
-    makeInput('2024-01-02', true, false, stretchEnabled),
+    'Tuesday 2024-01-02 (lectures with 30-minute travel buffers, lunch, dinner)',
+    makeInput({ date: '2024-01-02', blocks: tuesdayBlocks, stretchEnabled })
+  );
+  printPlan(
+    'Thursday 2024-01-04 (mid-week progress: Docker 120, DSA 200, Arabic 40, German 38, LinkedIn 30)',
+    makeInput({
+      date: '2024-01-04',
+      stretchEnabled,
+      trackMinutesDone: progress,
+      maxDailyFocusMinutes: 720,
+      stretchCapPercent: 300,
+    }),
     true
   );
-  printPlan(
-    'Saturday 2024-01-06 (no lectures)',
-    makeInput('2024-01-06', false, false, stretchEnabled)
-  );
-  printPlan(
-    'Friday 2024-01-05 (Jumu’ah block)',
-    makeInput('2024-01-05', true, true, stretchEnabled)
-  );
 }
+
+printPlan(
+  'Saturday 2024-01-06 (no lectures, lunch, dinner)',
+  makeInput({ date: '2024-01-06', blocks: saturdayBlocks, stretchEnabled: true })
+);

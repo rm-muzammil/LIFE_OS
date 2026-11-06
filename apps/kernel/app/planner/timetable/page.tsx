@@ -29,7 +29,7 @@ interface CommitmentForm {
   title: string;
   kind: PlannerCommitmentRow['kind'];
   scheduleType: 'weekly' | 'date';
-  weekday: string;
+  weekdays: string[];
   date: string;
   startTime: string;
   endTime: string;
@@ -45,7 +45,7 @@ const EMPTY_FORM: CommitmentForm = {
   title: '',
   kind: 'lecture',
   scheduleType: 'weekly',
-  weekday: '1',
+  weekdays: WEEKDAYS.map((_, index) => String(index)),
   date: '',
   startTime: '09:00',
   endTime: '10:00',
@@ -62,7 +62,9 @@ function toForm(commitment: PlannerCommitmentRow): CommitmentForm {
     title: commitment.title,
     kind: commitment.kind,
     scheduleType: commitment.date ? 'date' : 'weekly',
-    weekday: String(commitment.weekday ?? 0),
+    weekdays: commitment.weekday === null
+      ? WEEKDAYS.map((_, index) => String(index))
+      : [String(commitment.weekday)],
     date: commitment.date ?? '',
     startTime: commitment.startTime,
     endTime: commitment.endTime,
@@ -106,15 +108,28 @@ export default function PlannerTimetablePage() {
     setForm(EMPTY_FORM);
   }
 
+  function applyPreset(title: string, startTime: string, endTime: string) {
+    setEditing(null);
+    setForm({
+      ...EMPTY_FORM,
+      title,
+      kind: 'other',
+      startTime,
+      endTime,
+    });
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (form.scheduleType === 'weekly' && form.weekdays.length === 0) {
+      setError('Select at least one weekday.');
+      return;
+    }
     setSaving(true);
-    const body = {
+    const commonBody = {
       title: form.title,
       kind: form.kind,
-      weekday: form.scheduleType === 'weekly' ? Number(form.weekday) : null,
-      date: form.scheduleType === 'date' ? form.date : null,
       startTime: form.startTime,
       endTime: form.endTime,
       bufferBeforeMinutes: Number(form.bufferBeforeMinutes),
@@ -126,10 +141,32 @@ export default function PlannerTimetablePage() {
       active: true,
     };
     try {
-      await plannerRequest(
-        editing ? `/api/planner/commitments/${editing.id}` : '/api/planner/commitments',
-        { method: editing ? 'PATCH' : 'POST', ...jsonBody(body) }
-      );
+      if (form.scheduleType === 'date') {
+        await plannerRequest(
+          editing ? `/api/planner/commitments/${editing.id}` : '/api/planner/commitments',
+          {
+            method: editing ? 'PATCH' : 'POST',
+            ...jsonBody({ ...commonBody, weekday: null, date: form.date }),
+          }
+        );
+      } else {
+        const weekdays = form.weekdays.map(Number);
+        const firstWeekday = editing && editing.weekday !== null && weekdays.includes(editing.weekday)
+          ? editing.weekday
+          : weekdays[0];
+        if (editing) {
+          await plannerRequest(`/api/planner/commitments/${editing.id}`, {
+            method: 'PATCH',
+            ...jsonBody({ ...commonBody, weekday: firstWeekday, date: null }),
+          });
+        }
+        await Promise.all(weekdays
+          .filter((weekday) => !editing || weekday !== firstWeekday)
+          .map((weekday) => plannerRequest('/api/planner/commitments', {
+            method: 'POST',
+            ...jsonBody({ ...commonBody, weekday, date: null }),
+          })));
+      }
       resetForm();
       await refresh();
     } catch (cause) {
@@ -176,6 +213,28 @@ export default function PlannerTimetablePage() {
           <h2 className="text-base font-semibold text-zinc-100">{editing ? 'Edit commitment' : 'Add commitment'}</h2>
           <p className="mt-1 text-xs text-zinc-500">Recurring weekly lectures and commitments, or a single dated block.</p>
         </div>
+        {!editing && (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-500">Protected-time presets (editable before saving)</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                ['Lunch', '13:30', '14:15'],
+                ['Dinner', '20:00', '20:45'],
+                ['Family/rest', '21:15', '22:00'],
+                ['Exercise', '17:30', '18:15'],
+              ].map(([title, start, end]) => (
+                <button
+                  key={title}
+                  type="button"
+                  className="btn-secondary text-xs"
+                  onClick={() => applyPreset(title, start, end)}
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
           <label className="sm:col-span-2">
             <span className="label">Title</span>
@@ -197,12 +256,29 @@ export default function PlannerTimetablePage() {
             </select>
           </label>
           {form.scheduleType === 'weekly' ? (
-            <label>
-              <span className="label">Weekday</span>
-              <select className="input" value={form.weekday} onChange={(event) => setForm({ ...form, weekday: event.target.value })}>
-                {WEEKDAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}
-              </select>
-            </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="label">Repeat on</legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {WEEKDAYS.map((day, index) => {
+                  const weekday = String(index);
+                  return (
+                    <label key={day} className="flex items-center gap-2 text-xs text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={form.weekdays.includes(weekday)}
+                        onChange={(event) => setForm({
+                          ...form,
+                          weekdays: event.target.checked
+                            ? [...form.weekdays, weekday]
+                            : form.weekdays.filter((value) => value !== weekday),
+                        })}
+                      />
+                      {day}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
           ) : (
             <label>
               <span className="label">Date</span>

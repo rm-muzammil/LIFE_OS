@@ -41,6 +41,8 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   defaultTaskMinutes: 30,
   preferredSessionMinutes: 45,
   stretchEnabled: false,
+  stretchCapPercent: 150,
+  maxDailyFocusMinutes: 300,
 };
 
 export interface PrayerTimes {

@@ -24,6 +24,8 @@ const settings = {
   preferredSessionMinutes: 45,
   weekStart: 1,
   stretchEnabled: false,
+  stretchCapPercent: 150,
+  maxDailyFocusMinutes: 300,
 };
 
 function makeInput(overrides: Partial<PlannerEngineInput> = {}): PlannerEngineInput {
@@ -105,6 +107,8 @@ const linkedin = track({
 });
 const linkedinDistribution = spreadSessionsAcrossAllowedDays(2, 7);
 assert.deepEqual(linkedinDistribution, [0, 0, 0, 1, 0, 0, 1]);
+assert.deepEqual(spreadSessionsAcrossAllowedDays(7, 6), [1, 1, 1, 1, 1, 2]);
+assert.deepEqual(spreadSessionsAcrossAllowedDays(10, 6), [1, 2, 2, 1, 2, 2]);
 assert.deepEqual(getTrackSessionSizes(60, 2, 25, 45), [30, 30]);
 assert.deepEqual(
   getTrackDailyQuota({
@@ -124,15 +128,53 @@ assert.deepEqual(noLinkedInToday.sessions, []);
 assert.deepEqual(noLinkedInToday.dropped, []);
 console.log('PASS LinkedIn 60 minutes spreads as two 30-minute sessions on separated days');
 
+const docker = track({
+  id: 'docker',
+  title: 'Docker',
+  weeklyTargetMinutes: 300,
+  maxSessionMinutes: 90,
+});
+const arabic = track({ id: 'arabic', title: 'Arabic', weeklyTargetMinutes: 150 });
+const german = track({ id: 'german', title: 'German', weeklyTargetMinutes: 150 });
+assert.equal(getTrackDailyQuota({
+  date: '2024-01-02',
+  weekStart: 1,
+  preferredSessionMinutes: 45,
+  track: docker,
+  minutesDone: 0,
+}).sessionsToday, 1);
+const dsaTuesday = getTrackDailyQuota({
+  date: '2024-01-02',
+  weekStart: 1,
+  preferredSessionMinutes: 45,
+  track: track({ id: 'dsa', title: 'DSA', weeklyTargetMinutes: 420, maxSessionMinutes: 45 }),
+  minutesDone: 0,
+});
+assert.equal(dsaTuesday.sessionsToday, 1);
+for (const language of [arabic, german]) {
+  const firstDay = getTrackDailyQuota({
+    date: '2024-01-02',
+    weekStart: 1,
+    preferredSessionMinutes: 45,
+    track: language,
+    minutesDone: 0,
+  });
+  const secondDay = getTrackDailyQuota({
+    date: '2024-01-04',
+    weekStart: 1,
+    preferredSessionMinutes: 45,
+    track: language,
+    minutesDone: 0,
+  });
+  assert.equal(firstDay.sessionsToday, 0);
+  assert.equal(secondDay.sessionsToday, 1);
+}
+console.log('PASS cumulative quotas spread 7 and 10 sessions across six days and defer 4-session tracks on day zero');
+
 let dsaDone = 0;
 let dsaScheduled = 0;
-const dsa = track({
-  id: 'dsa',
-  title: 'DSA',
-  weeklyTargetMinutes: 420,
-  maxSessionMinutes: 45,
-  maxPerDayMinutes: 90,
-});
+const dsa = track({ id: 'dsa', title: 'DSA', weeklyTargetMinutes: 420, maxSessionMinutes: 45 });
+let dsaSessionCount = 0;
 for (const date of [
   '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04',
   '2024-01-05', '2024-01-06', '2024-01-07',
@@ -146,10 +188,33 @@ for (const date of [
   });
   const minutes = daily.sessionMinutesToday.reduce((sum, value) => sum + value, 0);
   dsaScheduled += minutes;
+  dsaSessionCount += daily.sessionMinutesToday.length;
   dsaDone += minutes;
 }
 assert.equal(dsaScheduled, 420);
+assert.ok(dsaSessionCount <= Math.ceil(dsa.weeklyTargetMinutes / 45));
 console.log('PASS DSA 420-minute quota distributes over the week and totals 420 minutes');
+
+for (const candidate of [docker, arabic, german]) {
+  let done = 0;
+  let sessionCount = 0;
+  for (const date of [
+    '2024-01-02', '2024-01-03', '2024-01-04',
+    '2024-01-05', '2024-01-06', '2024-01-07',
+  ]) {
+    const daily = getTrackDailyQuota({
+      date,
+      weekStart: 1,
+      preferredSessionMinutes: 45,
+      track: candidate,
+      minutesDone: done,
+    });
+    done += daily.sessionMinutesToday.reduce((sum, minutes) => sum + minutes, 0);
+    sessionCount += daily.sessionMinutesToday.length;
+  }
+  assert.ok(sessionCount <= Math.ceil(candidate.weeklyTargetMinutes / 45));
+}
+console.log('PASS tracks never receive more quota sessions in the week than their calculated need');
 
 const twentyFiveMinuteGapPlan = buildPlannerPlan(makeInput({
   fixedBlocks: [
@@ -215,15 +280,40 @@ console.log('PASS lecture travel buffers block 08:45 through 11:10');
 const parsedEngineSettings = parseSettingsInput({
   preferredSessionMinutes: 45,
   stretchEnabled: true,
+  stretchCapPercent: 200,
+  maxDailyFocusMinutes: 360,
 });
 assert.equal(parsedEngineSettings.ok && parsedEngineSettings.value.preferredSessionMinutes, 45);
 assert.equal(parsedEngineSettings.ok && parsedEngineSettings.value.stretchEnabled, true);
+assert.equal(parsedEngineSettings.ok && parsedEngineSettings.value.stretchCapPercent, 200);
+assert.equal(parsedEngineSettings.ok && parsedEngineSettings.value.maxDailyFocusMinutes, 360);
+assert.equal(parseSettingsInput({ stretchCapPercent: 99 }).ok, false);
+assert.equal(parseSettingsInput({ stretchCapPercent: 301 }).ok, false);
+assert.equal(parseSettingsInput({ maxDailyFocusMinutes: 59 }).ok, false);
+assert.equal(parseSettingsInput({ maxDailyFocusMinutes: 721 }).ok, false);
 
 const dailyCapPlan = buildPlannerPlan(makeInput({
-  tracks: [track({ maxPerDayMinutes: 50 })],
+  tracks: [track({ weeklyTargetMinutes: 1000, maxPerDayMinutes: 50 })],
 }));
 assert.ok(dailyCapPlan.dropped.some((item) => item.reason === 'daily-cap'));
 console.log('PASS track quota beyond max_per_day is reported as a daily-cap drop');
+
+const focusCapPlan = buildPlannerPlan(makeInput({
+  settings: { ...settings, maxDailyFocusMinutes: 300 },
+  roadmapTasks: [{ id: 'near-cap', title: 'Due task', dueDate: '2024-01-03', estimateMinutes: 290, priority: 1 }],
+  tracks: [track()],
+}));
+assert.equal(focusCapPlan.sessions.reduce((sum, session) => sum + session.plannedMinutes, 0), 290);
+assert.ok(focusCapPlan.dropped.some((item) => item.reason === 'focus-cap'));
+const overFocusCapPlan = buildPlannerPlan(makeInput({
+  settings: { ...settings, maxDailyFocusMinutes: 300 },
+  roadmapTasks: [{ id: 'over-cap', title: 'Over-cap due task', dueDate: '2024-01-03', estimateMinutes: 330, priority: 1 }],
+  tracks: [track()],
+}));
+assert.equal(overFocusCapPlan.sessions[0]?.plannedMinutes, 330);
+assert.ok(overFocusCapPlan.warnings.some((warning) => warning.includes('exceeding the daily focus cap')));
+assert.ok(overFocusCapPlan.dropped.some((item) => item.reason === 'focus-cap'));
+console.log('PASS due work is placed before focus cap, over-cap tasks warn, and quota is dropped with focus-cap');
 
 const morningPlan = buildPlannerPlan(makeInput({
   date: '2024-01-07',
@@ -346,11 +436,60 @@ const stretchPlan = buildPlannerPlan(makeInput({
 const stretchTotal = stretchPlan.sessions
   .filter((session) => session.trackId === 'track-1')
   .reduce((total, session) => total + session.plannedMinutes, 0);
+const stretchExtra = stretchPlan.sessions
+  .filter((session) => session.trackId === 'track-1' && session.extra)
+  .reduce((total, session) => total + session.plannedMinutes, 0);
 assert.ok(stretchPlan.sessions.some((session) => session.extra === true));
-assert.ok(stretchTotal <= 90);
+assert.ok(stretchExtra <= 100);
+assert.ok(stretchTotal <= 300);
 assert.ok(stretchPlan.sessions.filter((session) => session.trackId === 'track-1')
   .every((session) => session.plannedMinutes <= 45));
 console.log('PASS stretch mode fills leftover time without exceeding session or daily caps');
+
+const noExtraForZeroTarget = buildPlannerPlan(makeInput({
+  settings: { ...settings, stretchEnabled: true },
+  tracks: [track({ weeklyTargetMinutes: 0 })],
+}));
+assert.equal(noExtraForZeroTarget.sessions.some((session) => session.extra), false);
+console.log('PASS tracks with a zero weekly target never receive stretch extras');
+
+const weightedStretchPlan = buildPlannerPlan(makeInput({
+  settings: {
+    ...settings,
+    stretchEnabled: true,
+    preferredSessionMinutes: 25,
+    maxDailyFocusMinutes: 150,
+  },
+  tracks: [
+    track({ id: 'high', title: 'High', weeklyTargetMinutes: 400, maxPerDayMinutes: 150, maxSessionMinutes: 25, priority: 'high' }),
+    track({ id: 'medium', title: 'Medium', weeklyTargetMinutes: 400, maxPerDayMinutes: 150, maxSessionMinutes: 25, priority: 'medium' }),
+    track({ id: 'low', title: 'Low', weeklyTargetMinutes: 400, maxPerDayMinutes: 150, maxSessionMinutes: 25, priority: 'low' }),
+  ],
+  trackMinutesDone: { high: 400, medium: 400, low: 400 },
+}));
+const weightedExtras = weightedStretchPlan.sessions
+  .filter((session) => session.extra)
+  .reduce<Record<string, number>>((counts, session) => {
+    counts[session.trackId!] = (counts[session.trackId!] ?? 0) + 1;
+    return counts;
+  }, {});
+assert.deepEqual(weightedExtras, { high: 3, low: 1, medium: 2 });
+console.log('PASS stretch extras follow the 3:2:1 high/medium/low priority rotation');
+
+const protectedBlocks = [
+  { id: 'lecture-1-travel', title: 'Lecture 1 and travel', kind: 'commitment' as const, startMinute: 510, endMinute: 690 },
+  { id: 'lunch', title: 'Lunch', kind: 'commitment' as const, startMinute: 720, endMinute: 765 },
+  { id: 'lecture-2-travel', title: 'Lecture 2 and travel', kind: 'commitment' as const, startMinute: 810, endMinute: 960 },
+  { id: 'dinner', title: 'Dinner', kind: 'commitment' as const, startMinute: 1200, endMinute: 1245 },
+];
+const protectedPlan = buildPlannerPlan(makeInput({
+  date: '2024-01-02',
+  fixedBlocks: protectedBlocks,
+  settings: { ...settings, stretchEnabled: true },
+  tracks: [docker, dsa, arabic, german, linkedin],
+}));
+assertNoFixedOverlap(protectedPlan, protectedBlocks);
+console.log('PASS planned quota and stretch sessions never overlap lecture travel, lunch, or dinner protected time');
 
 let plannerCalled = false;
 let legacyCalled = false;

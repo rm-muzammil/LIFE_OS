@@ -856,6 +856,8 @@ export const plannerSettings = pgTable('planner_settings', {
   defaultTaskMinutes: integer('default_task_minutes').notNull().default(30),
   preferredSessionMinutes: integer('preferred_session_minutes').notNull().default(45),
   stretchEnabled: boolean('stretch_enabled').notNull().default(false),
+  stretchCapPercent: smallint('stretch_cap_percent').notNull().default(150),
+  maxDailyFocusMinutes: integer('max_daily_focus_minutes').notNull().default(300),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   wakeTimeCheck: check(
@@ -909,6 +911,14 @@ export const plannerSettings = pgTable('planner_settings', {
   preferredSessionMinutesCheck: check(
     'planner_settings_preferred_session_minutes_check',
     sql`${table.preferredSessionMinutes} BETWEEN 10 AND 240`
+  ),
+  stretchCapPercentCheck: check(
+    'planner_settings_stretch_cap_percent_check',
+    sql`${table.stretchCapPercent} BETWEEN 100 AND 300`
+  ),
+  maxDailyFocusMinutesCheck: check(
+    'planner_settings_max_daily_focus_minutes_check',
+    sql`${table.maxDailyFocusMinutes} BETWEEN 60 AND 720`
   ),
 }));
 

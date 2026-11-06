@@ -28,6 +28,8 @@ export interface PlannerSettingsInput {
   defaultTaskMinutes: number;
   preferredSessionMinutes: number;
   stretchEnabled: boolean;
+  stretchCapPercent: number;
+  maxDailyFocusMinutes: number;
 }
 
 export interface CommitmentInput {
@@ -156,7 +158,8 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
     'jumuahBlockMinutes', 'breakMinutes', 'minSessionMinutes', 'prayerAuto',
     'prayerCity', 'prayerCountry', 'prayerMethod', 'prayerAsrSchool',
     'engineEnabled', 'weekStart', 'slackPercent', 'defaultTaskMinutes',
-    'preferredSessionMinutes', 'stretchEnabled',
+    'preferredSessionMinutes', 'stretchEnabled', 'stretchCapPercent',
+    'maxDailyFocusMinutes',
   ];
   if (!fields.some((field) => body[field] !== undefined)) {
     return invalid('At least one planner setting is required');
@@ -204,6 +207,14 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
       const parsed = parseInteger(raw, field, 10, 240);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
+    } else if (field === 'stretchCapPercent') {
+      const parsed = parseInteger(raw, field, 100, 300);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'maxDailyFocusMinutes') {
+      const parsed = parseInteger(raw, field, 60, 720);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
     } else if (field === 'stretchEnabled') {
       if (typeof raw !== 'boolean') return invalid('stretchEnabled must be a boolean');
       value.stretchEnabled = raw;
@@ -245,6 +256,8 @@ export function mergeAndValidateSettings(
     defaultTaskMinutes: current?.defaultTaskMinutes ?? DEFAULT_PLANNER_SETTINGS.defaultTaskMinutes,
     preferredSessionMinutes: current?.preferredSessionMinutes ?? DEFAULT_PLANNER_SETTINGS.preferredSessionMinutes,
     stretchEnabled: current?.stretchEnabled ?? DEFAULT_PLANNER_SETTINGS.stretchEnabled,
+    stretchCapPercent: current?.stretchCapPercent ?? DEFAULT_PLANNER_SETTINGS.stretchCapPercent,
+    maxDailyFocusMinutes: current?.maxDailyFocusMinutes ?? DEFAULT_PLANNER_SETTINGS.maxDailyFocusMinutes,
     ...partial,
   };
   if (parseTimeToMinutes(merged.wakeTime) === parseTimeToMinutes(merged.sleepTime)) {
