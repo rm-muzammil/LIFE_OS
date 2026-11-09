@@ -366,6 +366,31 @@ export function validateCommitment(input: CommitmentInput): string | null {
   return null;
 }
 
+export function commitmentBufferWarning(
+  input: Pick<
+    CommitmentInput,
+    'startTime' | 'endTime' | 'bufferBeforeMinutes' | 'bufferAfterMinutes'
+  >
+): string | null {
+  const start = parseTimeToMinutes(input.startTime);
+  const end = parseTimeToMinutes(input.endTime);
+  if (
+    start === null ||
+    end === null ||
+    !Number.isSafeInteger(input.bufferBeforeMinutes) ||
+    !Number.isSafeInteger(input.bufferAfterMinutes)
+  ) {
+    return null;
+  }
+  if (
+    start - input.bufferBeforeMinutes < 0 ||
+    end + input.bufferAfterMinutes >= 1440
+  ) {
+    return 'travel buffer extends past midnight; blocked time will be clamped to the day boundary';
+  }
+  return null;
+}
+
 export function parseTrackInput(body: unknown, partial = false): Validation<Partial<TrackInput>> {
   if (!isRecord(body)) return invalid('A valid request body is required');
   const value: Partial<TrackInput> = {};

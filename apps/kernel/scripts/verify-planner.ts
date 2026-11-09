@@ -6,10 +6,12 @@ import {
 } from '@/lib/planner/blocks';
 import { resolvePrayerTimes } from '@/lib/planner/prayer';
 import {
+  commitmentBufferWarning,
   parseCommitmentInput,
   parseSettingsInput,
   validateCommitment,
 } from '@/lib/planner/validation';
+import { formatMinutesAsTime } from '@/lib/planner/time';
 import {
   DEFAULT_PLANNER_SETTINGS,
   type PlannerCommitmentRow,
@@ -80,6 +82,18 @@ const blocks = buildFixedBlocks({
     commitment('cancelled-lecture', { title: 'Cancelled lecture' }),
     commitment('not-started', { validFrom: '2026-11-07' }),
     commitment('expired', { validTo: '2026-11-05' }),
+    commitment('early-buffer', {
+      title: 'Early commitment',
+      startTime: '00:15',
+      endTime: '01:00',
+      bufferBeforeMinutes: 30,
+    }),
+    commitment('late-buffer', {
+      title: 'Late commitment',
+      startTime: '23:15',
+      endTime: '23:50',
+      bufferAfterMinutes: 30,
+    }),
   ],
   cancelledCommitmentIds: new Set(['cancelled-lecture']),
 });
@@ -88,6 +102,14 @@ assert(blocks.some((block) => block.commitmentId === 'lecture-a'), 'valid range 
 assert(!blocks.some((block) => block.commitmentId === 'not-started'), 'valid_from excludes early occurrence');
 assert(!blocks.some((block) => block.commitmentId === 'expired'), 'valid_to excludes late occurrence');
 assert(!blocks.some((block) => block.commitmentId === 'cancelled-lecture'), 'cancelled occurrence is omitted');
+const earlyBuffered = blocks.find((block) => block.commitmentId === 'early-buffer');
+assert.equal(earlyBuffered?.startMinute, 0, 'early buffer is clamped to midnight');
+assert.equal(earlyBuffered?.endMinute, 60);
+const lateBuffered = blocks.find((block) => block.commitmentId === 'late-buffer');
+assert.equal(lateBuffered?.startMinute, 1395);
+assert.equal(lateBuffered?.endMinute, 1439, 'late buffer is clamped to the last minute of the day');
+assert.equal(formatMinutesAsTime(earlyBuffered!.startMinute), '00:00');
+assert.equal(formatMinutesAsTime(lateBuffered!.endMinute), '23:59');
 assert(findOverlaps(blocks).some((warning) => warning.firstBlockId.includes('lecture-a') ||
   warning.secondBlockId.includes('lecture-a')), 'overlapping commitments produce warnings');
 assert(findOverlaps(blocks).some((warning) =>
@@ -185,6 +207,24 @@ const crossingMidnight = parseCommitmentInput({
 });
 assert(crossingMidnight.ok);
 assert.match(validateCommitment(crossingMidnight.value as Parameters<typeof validateCommitment>[0]) ?? '', /split this into two entries at midnight/);
+assert.equal(commitmentBufferWarning({
+  startTime: '00:15',
+  endTime: '01:00',
+  bufferBeforeMinutes: 30,
+  bufferAfterMinutes: 0,
+}), 'travel buffer extends past midnight; blocked time will be clamped to the day boundary');
+assert.equal(commitmentBufferWarning({
+  startTime: '23:15',
+  endTime: '23:50',
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 30,
+}), 'travel buffer extends past midnight; blocked time will be clamped to the day boundary');
+assert.equal(commitmentBufferWarning({
+  startTime: '23:00',
+  endTime: '23:30',
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 30,
+}), 'travel buffer extends past midnight; blocked time will be clamped to the day boundary');
 
 console.log('Planner foundation verification passed: overlaps, cancellation, validity, Friday Dhuhr, gaps, sleep, and prayer fallback.');
 }

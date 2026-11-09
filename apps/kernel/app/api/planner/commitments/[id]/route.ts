@@ -6,6 +6,7 @@ import {
   updateCommitment,
 } from '@/lib/planner/repo';
 import {
+  commitmentBufferWarning,
   parseCommitmentInput,
   validateCommitment,
   type CommitmentInput,
@@ -43,7 +44,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const error = validateCommitment(input);
   if (error) return NextResponse.json({ error }, { status: 400 });
   const commitment = await updateCommitment(userId, params.id, parsed.value);
-  return NextResponse.json({ commitment });
+  return NextResponse.json({ commitment, warning: commitmentBufferWarning(input) });
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {

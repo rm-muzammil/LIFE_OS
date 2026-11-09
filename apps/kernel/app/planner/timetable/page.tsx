@@ -5,6 +5,7 @@ import { AlertTriangle, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { PlannerCommitmentRow, PlannerBlock, PlannerOverlapWarning } from '@/lib/planner/types';
 import { formatMinutesAsTime } from '@/lib/planner/time';
 import { jsonBody, plannerRequest } from '@/lib/planner/client';
+import { commitmentBufferWarning } from '@/lib/planner/validation';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -203,6 +204,12 @@ export default function PlannerTimetablePage() {
     ...warning,
     date: day.date,
   }))) ?? [];
+  const bufferWarning = commitmentBufferWarning({
+    startTime: form.startTime,
+    endTime: form.endTime,
+    bufferBeforeMinutes: Number(form.bufferBeforeMinutes),
+    bufferAfterMinutes: Number(form.bufferAfterMinutes),
+  });
 
   return (
     <div className="space-y-5">
@@ -302,6 +309,11 @@ export default function PlannerTimetablePage() {
             <span className="label">Travel after (minutes)</span>
             <input className="input" type="number" min={0} max={180} value={form.bufferAfterMinutes} onChange={(event) => setForm({ ...form, bufferAfterMinutes: event.target.value })} />
           </label>
+          {bufferWarning && (
+            <p role="status" aria-live="polite" className="text-xs text-amber-300 sm:col-span-2">
+              {bufferWarning}
+            </p>
+          )}
           <label>
             <span className="label">Valid from (optional)</span>
             <input className="input" type="date" value={form.validFrom} onChange={(event) => setForm({ ...form, validFrom: event.target.value })} />

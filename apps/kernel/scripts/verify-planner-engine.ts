@@ -277,6 +277,44 @@ assert.equal(parseCommitmentInput({
 }).ok, false);
 console.log('PASS lecture travel buffers block 08:45 through 11:10');
 
+const midnightCommitments: PlannerCommitmentRow[] = [
+  {
+    ...bufferedCommitment,
+    id: '00000000-0000-4000-8000-000000000002',
+    title: 'Early commitment',
+    weekday: 3,
+    startTime: '00:15',
+    endTime: '01:00',
+    bufferBeforeMinutes: 30,
+    bufferAfterMinutes: 0,
+  },
+  {
+    ...bufferedCommitment,
+    id: '00000000-0000-4000-8000-000000000003',
+    title: 'Late commitment',
+    weekday: 3,
+    startTime: '23:15',
+    endTime: '23:50',
+    bufferBeforeMinutes: 0,
+    bufferAfterMinutes: 30,
+  },
+];
+const midnightBlocks = buildFixedBlocks({
+  date: '2024-01-03',
+  settings: DEFAULT_PLANNER_SETTINGS,
+  prayers: { fajr: '05:30', dhuhr: '12:15', asr: '15:30', maghrib: '17:45', isha: '19:00' },
+  commitments: midnightCommitments,
+}).filter((block) => block.kind === 'commitment');
+assert.deepEqual(
+  midnightBlocks.map(({ startMinute, endMinute }) => [startMinute, endMinute]),
+  [[0, 60], [1395, 1439]],
+);
+const midnightPlan = buildPlannerPlan(makeInput({ fixedBlocks: midnightBlocks }));
+assert.ok(midnightPlan.sessions.every((session) =>
+  minute(session.startTime) >= 0 && minute(session.endTime) < 1440
+));
+console.log('PASS engine plans with early and late buffered commitments clamped to day boundaries');
+
 const parsedEngineSettings = parseSettingsInput({
   preferredSessionMinutes: 45,
   stretchEnabled: true,
