@@ -85,13 +85,15 @@ function commitmentBlocks(
       title: commitment.title,
       kind: 'commitment' as const,
       commitmentId: commitment.id,
-      startMinute: start,
-      endMinute: end,
+      startMinute: Math.max(0, start - commitment.bufferBeforeMinutes),
+      endMinute: Math.min(1439, end + commitment.bufferAfterMinutes),
     }];
   });
 }
 
-function sleepBlocks(settings: PlannerSettings): PlannerBlock[] {
+export function buildSleepBlocks(
+  settings: Pick<PlannerSettings, 'wakeTime' | 'sleepTime'>
+): PlannerBlock[] {
   const wake = parseTimeToMinutes(settings.wakeTime);
   const sleep = parseTimeToMinutes(settings.sleepTime);
   if (wake === null || sleep === null || sleep === wake) return [];
@@ -131,7 +133,7 @@ export function buildFixedBlocks(params: {
       params.commitments,
       params.cancelledCommitmentIds ?? new Set<string>()
     ),
-    ...sleepBlocks(params.settings),
+    ...buildSleepBlocks(params.settings),
   ];
   return blocks.sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute);
 }

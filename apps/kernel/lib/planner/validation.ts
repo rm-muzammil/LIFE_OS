@@ -22,6 +22,14 @@ export interface PlannerSettingsInput {
   prayerCountry: string | null;
   prayerMethod: number;
   prayerAsrSchool: number;
+  engineEnabled: boolean;
+  weekStart: number;
+  slackPercent: number;
+  defaultTaskMinutes: number;
+  preferredSessionMinutes: number;
+  stretchEnabled: boolean;
+  stretchCapPercent: number;
+  maxDailyFocusMinutes: number;
 }
 
 export interface CommitmentInput {
@@ -31,6 +39,8 @@ export interface CommitmentInput {
   date: string | null;
   startTime: string;
   endTime: string;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
   validFrom: string | null;
   validTo: string | null;
   location: string | null;
@@ -147,6 +157,9 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
     'wakeTime', 'sleepTime', 'prayerBlockMinutes', 'prayerBufferBeforeMinutes',
     'jumuahBlockMinutes', 'breakMinutes', 'minSessionMinutes', 'prayerAuto',
     'prayerCity', 'prayerCountry', 'prayerMethod', 'prayerAsrSchool',
+    'engineEnabled', 'weekStart', 'slackPercent', 'defaultTaskMinutes',
+    'preferredSessionMinutes', 'stretchEnabled', 'stretchCapPercent',
+    'maxDailyFocusMinutes',
   ];
   if (!fields.some((field) => body[field] !== undefined)) {
     return invalid('At least one planner setting is required');
@@ -178,6 +191,36 @@ export function parseSettingsInput(body: unknown): Validation<Partial<PlannerSet
       const parsed = parseInteger(raw, field, 0, 1);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
+    } else if (field === 'weekStart') {
+      const parsed = parseInteger(raw, field, 0, 6);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'slackPercent') {
+      const parsed = parseInteger(raw, field, 0, 50);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'defaultTaskMinutes') {
+      const parsed = parseInteger(raw, field, 5, 240);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'preferredSessionMinutes') {
+      const parsed = parseInteger(raw, field, 10, 240);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'stretchCapPercent') {
+      const parsed = parseInteger(raw, field, 100, 300);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'maxDailyFocusMinutes') {
+      const parsed = parseInteger(raw, field, 60, 720);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    } else if (field === 'stretchEnabled') {
+      if (typeof raw !== 'boolean') return invalid('stretchEnabled must be a boolean');
+      value.stretchEnabled = raw;
+    } else if (field === 'engineEnabled') {
+      if (typeof raw !== 'boolean') return invalid('engineEnabled must be a boolean');
+      value.engineEnabled = raw;
     } else if (field === 'prayerAuto') {
       if (typeof raw !== 'boolean') return invalid('prayerAuto must be a boolean');
       value.prayerAuto = raw;
@@ -207,6 +250,14 @@ export function mergeAndValidateSettings(
     prayerCountry: current?.prayerCountry ?? DEFAULT_PLANNER_SETTINGS.prayerCountry,
     prayerMethod: current?.prayerMethod ?? DEFAULT_PLANNER_SETTINGS.prayerMethod,
     prayerAsrSchool: current?.prayerAsrSchool ?? DEFAULT_PLANNER_SETTINGS.prayerAsrSchool,
+    engineEnabled: current?.engineEnabled ?? DEFAULT_PLANNER_SETTINGS.engineEnabled,
+    weekStart: current?.weekStart ?? DEFAULT_PLANNER_SETTINGS.weekStart,
+    slackPercent: current?.slackPercent ?? DEFAULT_PLANNER_SETTINGS.slackPercent,
+    defaultTaskMinutes: current?.defaultTaskMinutes ?? DEFAULT_PLANNER_SETTINGS.defaultTaskMinutes,
+    preferredSessionMinutes: current?.preferredSessionMinutes ?? DEFAULT_PLANNER_SETTINGS.preferredSessionMinutes,
+    stretchEnabled: current?.stretchEnabled ?? DEFAULT_PLANNER_SETTINGS.stretchEnabled,
+    stretchCapPercent: current?.stretchCapPercent ?? DEFAULT_PLANNER_SETTINGS.stretchCapPercent,
+    maxDailyFocusMinutes: current?.maxDailyFocusMinutes ?? DEFAULT_PLANNER_SETTINGS.maxDailyFocusMinutes,
     ...partial,
   };
   if (parseTimeToMinutes(merged.wakeTime) === parseTimeToMinutes(merged.sleepTime)) {
@@ -263,6 +314,13 @@ export function parseCommitmentInput(
     if (!parsed.ok) return parsed;
     value.endTime = parsed.value;
   }
+  for (const field of ['bufferBeforeMinutes', 'bufferAfterMinutes'] as const) {
+    if (!partial || body[field] !== undefined) {
+      const parsed = parseInteger(body[field] ?? 0, field, 0, 180);
+      if (!parsed.ok) return parsed;
+      value[field] = parsed.value;
+    }
+  }
   for (const field of ['validFrom', 'validTo'] as const) {
     if (!partial || body[field] !== undefined) {
       if (!partial && body[field] === undefined) {
@@ -304,6 +362,31 @@ export function validateCommitment(input: CommitmentInput): string | null {
   }
   if (input.validFrom && input.validTo && input.validFrom > input.validTo) {
     return 'validFrom must not be after validTo';
+  }
+  return null;
+}
+
+export function commitmentBufferWarning(
+  input: Pick<
+    CommitmentInput,
+    'startTime' | 'endTime' | 'bufferBeforeMinutes' | 'bufferAfterMinutes'
+  >
+): string | null {
+  const start = parseTimeToMinutes(input.startTime);
+  const end = parseTimeToMinutes(input.endTime);
+  if (
+    start === null ||
+    end === null ||
+    !Number.isSafeInteger(input.bufferBeforeMinutes) ||
+    !Number.isSafeInteger(input.bufferAfterMinutes)
+  ) {
+    return null;
+  }
+  if (
+    start - input.bufferBeforeMinutes < 0 ||
+    end + input.bufferAfterMinutes >= 1440
+  ) {
+    return 'travel buffer extends past midnight; blocked time will be clamped to the day boundary';
   }
   return null;
 }

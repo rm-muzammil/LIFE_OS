@@ -35,6 +35,14 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   prayerCountry: null,
   prayerMethod: 1,
   prayerAsrSchool: 1,
+  engineEnabled: false,
+  weekStart: 1,
+  slackPercent: 15,
+  defaultTaskMinutes: 30,
+  preferredSessionMinutes: 45,
+  stretchEnabled: false,
+  stretchCapPercent: 150,
+  maxDailyFocusMinutes: 300,
 };
 
 export interface PrayerTimes {

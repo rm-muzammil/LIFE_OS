@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getApiUserId } from '@/lib/auth';
 import { createCommitment, listCommitments } from '@/lib/planner/repo';
 import {
+  commitmentBufferWarning,
   parseCommitmentInput,
   validateCommitment,
   type CommitmentInput,
@@ -24,5 +25,5 @@ export async function POST(request: NextRequest) {
   const error = validateCommitment(input);
   if (error) return NextResponse.json({ error }, { status: 400 });
   const commitment = await createCommitment(userId, input);
-  return NextResponse.json({ commitment }, { status: 201 });
+  return NextResponse.json({ commitment, warning: commitmentBufferWarning(input) }, { status: 201 });
 }
