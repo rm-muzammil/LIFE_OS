@@ -8,9 +8,10 @@ export function parseTimeToMinutes(value: string): number | null {
 }
 
 export function formatMinutesAsTime(value: number): string {
-  if (!Number.isSafeInteger(value) || value < 0 || value >= 1440) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 1440) {
     throw new RangeError('Minutes must be an integer within one day');
   }
+  if (value === 1440) return '00:00';
   const hours = Math.floor(value / 60);
   const minutes = value % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;

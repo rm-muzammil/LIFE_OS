@@ -86,7 +86,7 @@ function commitmentBlocks(
       kind: 'commitment' as const,
       commitmentId: commitment.id,
       startMinute: Math.max(0, start - commitment.bufferBeforeMinutes),
-      endMinute: Math.min(1439, end + commitment.bufferAfterMinutes),
+      endMinute: Math.min(1440, end + commitment.bufferAfterMinutes),
     }];
   });
 }

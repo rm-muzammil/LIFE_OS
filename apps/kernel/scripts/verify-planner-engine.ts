@@ -11,7 +11,7 @@ import {
 } from '@/lib/planner/engine';
 import { buildFixedBlocks } from '@/lib/planner/blocks';
 import { DEFAULT_PLANNER_SETTINGS, type PlannerCommitmentRow } from '@/lib/planner/types';
-import { parseTimeToMinutes } from '@/lib/planner/time';
+import { formatMinutesAsTime, parseTimeToMinutes } from '@/lib/planner/time';
 import { parseCommitmentInput, parseSettingsInput } from '@/lib/planner/validation';
 
 const settings = {
@@ -307,13 +307,30 @@ const midnightBlocks = buildFixedBlocks({
 }).filter((block) => block.kind === 'commitment');
 assert.deepEqual(
   midnightBlocks.map(({ startMinute, endMinute }) => [startMinute, endMinute]),
-  [[0, 60], [1395, 1439]],
+  [[0, 60], [1395, 1440]],
 );
+assert.equal(midnightBlocks[0]?.startMinute, 0, 'negative before-buffer start is clipped to today');
+assert.equal(formatMinutesAsTime(midnightBlocks[0]!.startMinute), '00:00');
+assert.equal(formatMinutesAsTime(midnightBlocks[1]!.endMinute), '00:00');
 const midnightPlan = buildPlannerPlan(makeInput({ fixedBlocks: midnightBlocks }));
 assert.ok(midnightPlan.sessions.every((session) =>
   minute(session.startTime) >= 0 && minute(session.endTime) < 1440
 ));
-console.log('PASS engine plans with early and late buffered commitments clamped to day boundaries');
+const lateCommitment = midnightBlocks[1]!;
+const finalMinutePlan = buildPlannerPlan(makeInput({
+  nowMinute: 1438,
+  fixedBlocks: [lateCommitment],
+  roadmapTasks: [{
+    id: 'last-minute-task',
+    title: 'Last-minute task',
+    dueDate: '2024-01-03',
+    estimateMinutes: 1,
+    priority: 1,
+  }],
+  settings: { ...settings, wakeTime: '23:58', sleepTime: '23:57', minSessionMinutes: 1 },
+}));
+assert.deepEqual(finalMinutePlan.sessions, [], 'engine cannot schedule work after the buffered block begins');
+console.log('PASS engine uses midnight as the arithmetic boundary, clips early starts to today, and blocks final-minute scheduling');
 
 const parsedEngineSettings = parseSettingsInput({
   preferredSessionMinutes: 45,

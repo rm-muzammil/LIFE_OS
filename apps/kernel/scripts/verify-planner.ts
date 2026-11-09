@@ -105,11 +105,16 @@ assert(!blocks.some((block) => block.commitmentId === 'cancelled-lecture'), 'can
 const earlyBuffered = blocks.find((block) => block.commitmentId === 'early-buffer');
 assert.equal(earlyBuffered?.startMinute, 0, 'early buffer is clamped to midnight');
 assert.equal(earlyBuffered?.endMinute, 60);
+assert.equal(formatMinutesAsTime(earlyBuffered!.startMinute), '00:00');
 const lateBuffered = blocks.find((block) => block.commitmentId === 'late-buffer');
 assert.equal(lateBuffered?.startMinute, 1395);
-assert.equal(lateBuffered?.endMinute, 1439, 'late buffer is clamped to the last minute of the day');
-assert.equal(formatMinutesAsTime(earlyBuffered!.startMinute), '00:00');
-assert.equal(formatMinutesAsTime(lateBuffered!.endMinute), '23:59');
+assert.equal(lateBuffered?.endMinute, 1440, 'late buffer uses midnight as its exclusive end boundary');
+assert.equal(formatMinutesAsTime(lateBuffered!.endMinute), '00:00', 'midnight boundary displays as 00:00');
+assert.deepEqual(
+  computeFreeGaps([lateBuffered!], 1439, 1440),
+  [],
+  'late buffered commitment occupies the final minute before midnight'
+);
 assert(findOverlaps(blocks).some((warning) => warning.firstBlockId.includes('lecture-a') ||
   warning.secondBlockId.includes('lecture-a')), 'overlapping commitments produce warnings');
 assert(findOverlaps(blocks).some((warning) =>
